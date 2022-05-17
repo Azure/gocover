@@ -10,7 +10,7 @@ Following is an exmaple of how to generate diff coverage report in HTML format, 
 gocover --cover-profile=coverage.out --compare-branch=origin/master --format html --failure-rate 20.0 --output coverage.html
 ```
 
-![project overview](./images/overview.svg)
+![project overview](./docs/images/overview.svg)
 
 ## Contributing
 
