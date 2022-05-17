@@ -3,12 +3,14 @@
 > This repo has been populated by an initial template to help get you started. Please
 > make sure to update the content to build a great experience for community-building.
 
-As the maintainer of this project, please make a few updates:
+`gocover` project aims to provide a tool for generating go test coverage between two git commits. Following graph gives the overview of the process of `gocover`.
 
-- Improving this README.MD file to provide a great experience
-- Updating SUPPORT.MD with content about this project's support experience
-- Understanding the security reporting process in SECURITY.MD
-- Remove this section from the README
+Following is an exmaple of how to generate diff coverage report in HTML format, and failure rate should be less than 20%.
+```
+gocover --cover-profile=coverage.out --compare-branch=origin/master --format html --failure-rate 20.0 --output coverage.html
+```
+
+![project overview](./docs/images/overview.svg)
 
 ## Contributing
 
