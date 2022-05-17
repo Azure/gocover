@@ -21,11 +21,12 @@ type DiffOptions struct {
 	FailureRate  float64
 	ReportFormat string
 	Output       string
-	Exclude      string
+	Exclude      []string
 }
 
-// NewOptions returns a Options with default values.
-func NewOptions() *DiffOptions {
+// NewDiffOptions returns a Options with default values.
+// TODO: make format as enumerate string type
+func NewDiffOptions() *DiffOptions {
 	return &DiffOptions{
 		CompareBranch: DefaultCompareBranch,
 		ReportFormat:  "html",
@@ -48,7 +49,7 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	diff := report.NewDiffCoverageReport()
-	if err := diff.ApplyFilter(profiles, []string{o.Exclude}); err != nil {
+	if err := diff.ApplyFilter(profiles, o.Exclude); err != nil {
 		return fmt.Errorf("apply filters %w", err)
 	}
 	if err := diff.DiffCoverage(profiles, patch); err != nil {

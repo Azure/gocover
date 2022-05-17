@@ -23,7 +23,7 @@ gocover --cover-profile=coverage.out --compare-branch=origin/master --format htm
 
 // NewGoCoverCommand creates a command object for generating diff coverage reporter.
 func NewGoCoverCommand() *cobra.Command {
-	o := options.NewOptions()
+	o := options.NewDiffOptions()
 
 	cmd := &cobra.Command{
 		Use:     "gocover",
@@ -41,7 +41,7 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.CoverProfile, "cover-profile", o.CoverProfile, `coverage profile produced by 'go test'`)
 	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
-	cmd.Flags().StringVar(&o.Exclude, "exclude", o.Exclude, "exclude files for diff coverage calucation")
+	cmd.Flags().StringSliceVar(&o.Exclude, "exclude", []string{}, "exclude files for diff coverage calucation")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
 	cmd.Flags().Float64Var(&o.FailureRate, "failure-rate", o.FailureRate, "returns an error code if coverage or quality score is above failure rate")
 
