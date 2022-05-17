@@ -48,10 +48,7 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git diff: %w", err)
 	}
 
-	diff := report.NewDiffCoverageReport()
-	if err := diff.ApplyFilter(profiles, o.Exclude); err != nil {
-		return fmt.Errorf("apply filters %w", err)
-	}
+	diff := report.NewDiffCoverageReport(o.Exclude)
 	if err := diff.DiffCoverage(profiles, patch); err != nil {
 		return fmt.Errorf("diff coverage %w", err)
 	}

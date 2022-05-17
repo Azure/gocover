@@ -5,6 +5,11 @@
 
 `gocover` project aims to provide a tool for generating go test coverage between two git commits. Following graph gives the overview of the process of `gocover`.
 
+Following is an exmaple of how to generate diff coverage report in HTML format, and failure rate should be less than 20%.
+```
+gocover --cover-profile=coverage.out --compare-branch=origin/master --format html --failure-rate 20.0 --output coverage.html
+```
+
 ![project overview](./images/overview.svg)
 
 ## Contributing

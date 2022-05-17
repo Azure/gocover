@@ -7,7 +7,9 @@ import (
 
 // NewDiffCoverageReport creates a diff coverage report instance.
 // TODO: implement it
-func NewDiffCoverageReport() DiffCoverageReport {
+func NewDiffCoverageReport(
+	filters []string,
+) DiffCoverageReport {
 	return nil
 }
 
@@ -15,8 +17,6 @@ func NewDiffCoverageReport() DiffCoverageReport {
 type DiffCoverageReport interface {
 	// DiffCoverage calculate diff coverage
 	DiffCoverage(profile []*cover.Profile, path gittool.Patch) error
-	// ApplyFilter filters the cover profile with filters
-	ApplyFilter(profile []*cover.Profile, filters []string) error
 	// generate diff coverage report
 	GenerateReport(profile []*cover.Profile) error
 }
