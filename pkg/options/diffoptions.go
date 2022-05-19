@@ -15,8 +15,9 @@ const (
 
 // DiffOptions contains the input to the gocover command.
 type DiffOptions struct {
-	CoverProfile  string
-	CompareBranch string
+	CoverProfile   string
+	CompareBranch  string
+	RepositoryPath string
 
 	FailureRate  float64
 	ReportFormat string
@@ -42,8 +43,11 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parse coverage profile: %w", err)
 	}
 
-	gitClient := gittool.NewGitClient()
-	patch, err := gitClient.DiffCommitted(o.CompareBranch)
+	gitClient, err := gittool.NewGitClient(o.RepositoryPath)
+	if err != nil {
+		return fmt.Errorf("git repository: %w", err)
+	}
+	patch, err := gitClient.DiffChangesFromCommitted(o.CompareBranch)
 	if err != nil {
 		return fmt.Errorf("git diff: %w", err)
 	}

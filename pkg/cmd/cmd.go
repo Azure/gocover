@@ -40,6 +40,7 @@ func NewGoCoverCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&o.CoverProfile, "cover-profile", o.CoverProfile, `coverage profile produced by 'go test'`)
 	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
+	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
 	cmd.Flags().StringSliceVar(&o.Exclude, "exclude", []string{}, "exclude files for diff coverage calucation")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
