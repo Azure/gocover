@@ -16,7 +16,7 @@ func NewDiffCoverageReport(
 // TODO: implement DiffCoverageReport interface
 type DiffCoverageReport interface {
 	// DiffCoverage calculate diff coverage
-	DiffCoverage(profile []*cover.Profile, path gittool.Patch) error
+	DiffCoverage(profile []*cover.Profile, changes []*gittool.Change) error
 	// generate diff coverage report
 	GenerateReport(profile []*cover.Profile) error
 }
