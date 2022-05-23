@@ -13,7 +13,7 @@ import (
 
 func TestNewReportGenerator(t *testing.T) {
 	t.Run("NewReportGenerator", func(t *testing.T) {
-		NewReportGenerator(&Statistics{}, "colorful")
+		NewReportGenerator(&Statistics{}, "colorful", "", "")
 	})
 }
 
@@ -37,7 +37,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, g.reportName))
+		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -98,7 +98,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, g.reportName))
+		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -194,6 +194,25 @@ func TestIntsJoin(t *testing.T) {
 
 		for _, testcase := range testsuites {
 			actual := intsJoin(testcase.input)
+			if testcase.expected != actual {
+				t.Errorf("expected %s, but get %s", testcase.expected, actual)
+			}
+		}
+	})
+}
+
+func TestFinalName(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		testsuites := []struct {
+			expected string
+			input    string
+		}{
+			{input: "a", expected: "a.html"},
+			{input: "b", expected: "b.html"},
+			{input: "c", expected: "c.html"},
+		}
+		for _, testcase := range testsuites {
+			actual := finalName(testcase.input)
 			if testcase.expected != actual {
 				t.Errorf("expected %s, but get %s", testcase.expected, actual)
 			}

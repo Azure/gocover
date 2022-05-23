@@ -23,6 +23,10 @@ type Statistics struct {
 type CoverageProfile struct {
 	// FileName indicates which file belongs to this coverage profile.
 	FileName string
+	// TotalLines indicates total lines of this coverage profile.
+	TotalLines int
+	// CoveredLines indicates covered lines of thie coverage profile.
+	CoveredLines int
 	// CoveragePercent indicates the diff coverage percent for this file.
 	CoveragePercent int
 	// TotalViolationLines indicates the total lines that miss full coverage.

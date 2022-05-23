@@ -42,9 +42,11 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
 	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
-	cmd.Flags().StringSliceVar(&o.Exclude, "exclude", []string{}, "exclude files for diff coverage calucation")
+	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
 	cmd.Flags().Float64Var(&o.FailureRate, "failure-rate", o.FailureRate, "returns an error code if coverage or quality score is above failure rate")
+	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
+	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
 
 	cmd.MarkFlagRequired("cover-profile")
 

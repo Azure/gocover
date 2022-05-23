@@ -46,6 +46,8 @@ const (
 func NewReportGenerator(
 	statistics *Statistics,
 	codeStyle string,
+	outputPath string,
+	reportName string,
 ) ReportGenerator {
 	style := styles.Get(codeStyle)
 	if style == nil {
@@ -61,6 +63,8 @@ func NewReportGenerator(
 		lexer:      lexer,
 		statistics: statistics,
 		style:      style,
+		outputPath: outputPath,
+		reportName: reportName,
 	}
 }
 
@@ -72,7 +76,7 @@ func (g *htmlReportGenerator) GenerateReport() error {
 		return fmt.Errorf("process code snippets: %w", err)
 	}
 
-	reportFile := filepath.Join(g.outputPath, g.reportName)
+	reportFile := filepath.Join(g.outputPath, finalName(g.reportName))
 	f, err := os.Create(reportFile)
 	if err != nil {
 		return fmt.Errorf("create report file: %w", err)
@@ -128,6 +132,10 @@ func (g *htmlReportGenerator) processCodeSnippets() error {
 	}
 
 	return nil
+}
+
+func finalName(reportName string) string {
+	return fmt.Sprintf("%s.html", reportName)
 }
 
 // htmlCoverageReportTemplate is the render engine for html coverage report.

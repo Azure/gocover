@@ -21,8 +21,10 @@ type DiffOptions struct {
 
 	FailureRate  float64
 	ReportFormat string
+	ReportName   string
 	Output       string
-	Exclude      []string
+	Excludes     []string
+	Style        string
 }
 
 // NewDiffOptions returns a Options with default values.
@@ -47,17 +49,24 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("git repository: %w", err)
 	}
-	patch, err := gitClient.DiffChangesFromCommitted(o.CompareBranch)
+	changes, err := gitClient.DiffChangesFromCommitted(o.CompareBranch)
 	if err != nil {
 		return fmt.Errorf("git diff: %w", err)
 	}
 
-	diff := report.NewDiffCoverageReport(o.Exclude)
-	if err := diff.DiffCoverage(profiles, patch); err != nil {
-		return fmt.Errorf("diff coverage %w", err)
+	diffCoverage := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch)
+	statistics, err := diffCoverage.GenerateDiffCoverage()
+	if err != nil {
+		return fmt.Errorf("diff coverage: %w", err)
 	}
-	if err := diff.GenerateReport(profiles); err != nil {
-		return fmt.Errorf("generate report %w", err)
+
+	g := report.NewReportGenerator(statistics, o.Style, o.Output, o.ReportName)
+	if err := g.GenerateReport(); err != nil {
+		return fmt.Errorf("generate report: %w", err)
+	}
+
+	if 100-statistics.TotalCoveragePercent >= int(o.FailureRate) {
+		return fmt.Errorf("total coverage pass rate is: %d", statistics.TotalCoveragePercent)
 	}
 
 	return nil
