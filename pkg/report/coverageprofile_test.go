@@ -743,3 +743,40 @@ func TestMinInt(t *testing.T) {
 		}
 	})
 }
+
+func TestBinarySeachForProfileBlock(t *testing.T) {
+	t.Run("binarySeachForProfileBlock", func(t *testing.T) {
+		block0 := cover.ProfileBlock{StartLine: 1, EndLine: 3}
+		block1 := cover.ProfileBlock{StartLine: 3, EndLine: 5}
+		block2 := cover.ProfileBlock{StartLine: 7, EndLine: 7}
+		block3 := cover.ProfileBlock{StartLine: 8, EndLine: 10}
+
+		blocks := []cover.ProfileBlock{block0, block1, block2, block3}
+
+		testsuites := []struct {
+			input  int
+			expect *cover.ProfileBlock
+		}{
+			{input: 0, expect: nil},
+			{input: 1, expect: &blocks[0]},
+			{input: 2, expect: &blocks[0]},
+			{input: 3, expect: &blocks[1]},
+			{input: 4, expect: &blocks[1]},
+			{input: 5, expect: &blocks[1]},
+			{input: 6, expect: nil},
+			{input: 7, expect: &blocks[2]},
+			{input: 8, expect: &blocks[3]},
+			{input: 9, expect: &blocks[3]},
+			{input: 10, expect: &blocks[3]},
+			{input: 11, expect: nil},
+		}
+
+		for _, testcase := range testsuites {
+			actual := binarySeachForProfileBlock(blocks, 0, len(blocks)-1, testcase.input)
+			if actual != testcase.expect {
+				t.Errorf("expect %v, but get %v", testcase.expect, actual)
+			}
+		}
+	})
+
+}

@@ -141,16 +141,19 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change) *CoverageProfile {
 	var total, covered int64
 
+	blocks := profile.Blocks
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i].StartLine < blocks[j].StartLine
+	})
+
 	violationsMap := make(map[int]bool)
-	// NumStmt indicates the number of statements in a code block, it not includes non statements,
+	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
 	// which means that the value of NumStmt is less or equal tothe total numbers of the code block.
-	for _, b := range profile.Blocks {
+	for _, b := range blocks {
 		total += int64(b.NumStmt)
 		if b.Count > 0 {
 			covered += int64(b.NumStmt)
 		} else {
-			// TODO:
-			// This part does not reflect the accurate the violcation lines.
 			for i := b.StartLine; i <= b.EndLine; i++ {
 				violationsMap[i] = true
 			}
@@ -188,48 +191,45 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 // generateCoverageProfileWithModifyMode generates for modify file
 func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gittool.Change) *CoverageProfile {
 
+	blocks := profile.Blocks
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i].StartLine < blocks[j].StartLine
+	})
+
 	var total, covered int64
 	var totalViolationLines []int
-
 	var violationSections []*ViolationSection
 
-	for _, b := range profile.Blocks {
+	// for each section contents, find each line in profile block and judge it
+	for _, section := range change.Sections {
 
-		for _, s := range change.Sections {
-
-			p1 := s.StartLine <= b.StartLine && s.EndLine >= b.EndLine
-			p2 := s.StartLine >= b.StartLine && s.EndLine >= b.EndLine && b.EndLine > s.StartLine
-			p3 := s.StartLine <= b.StartLine && s.EndLine <= b.EndLine && s.EndLine >= b.StartLine
-			p4 := s.StartLine >= b.StartLine && s.EndLine <= b.EndLine
-
-			if !(p1 || p2 || p3 || p4) {
+		var violationLines []int
+		for lineNo := section.StartLine; lineNo <= section.EndLine; lineNo++ {
+			block := binarySeachForProfileBlock(blocks, 0, len(blocks)-1, lineNo)
+			if block == nil {
 				continue
 			}
 
-			total += int64(b.NumStmt)
-			if b.Count > 0 {
-				covered += int64(b.NumStmt)
+			// check line?
+
+			total++
+			if block.Count > 0 {
+				covered++
 			} else {
-				violationsMap := make(map[int]bool)
-
-				start := maxInt(s.StartLine, b.StartLine)
-				end := minInt(s.EndLine, b.EndLine)
-
-				for i := start; i <= end; i++ {
-					violationsMap[i] = true
-				}
-
-				violationLines := sortLines(violationsMap)
-
-				violationSections = append(violationSections, &ViolationSection{
-					StartLine:      s.StartLine,
-					EndLine:        s.EndLine,
-					Contents:       s.Contents,
-					ViolationLines: violationLines,
-				})
-
-				totalViolationLines = append(totalViolationLines, violationLines...)
+				violationLines = append(violationLines, lineNo)
 			}
+
+		}
+
+		if len(violationLines) != 0 {
+			violationSections = append(violationSections, &ViolationSection{
+				StartLine:      section.StartLine,
+				EndLine:        section.EndLine,
+				Contents:       section.Contents,
+				ViolationLines: violationLines,
+			})
+
+			totalViolationLines = append(totalViolationLines, violationLines...)
 		}
 
 	}
@@ -248,7 +248,25 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 		TotalViolationLines: totalViolationLines,
 		ViolationSections:   violationSections,
 	}
+}
 
+func binarySeachForProfileBlock(blocks []cover.ProfileBlock, left int, right int, lineNo int) *cover.ProfileBlock {
+
+	var mid int
+	for left <= right {
+		mid = (left + right) >> 1
+		// current line is in this block
+		if blocks[mid].StartLine <= lineNo && blocks[mid].EndLine >= lineNo {
+			return &blocks[mid]
+		}
+		if blocks[mid].StartLine > lineNo {
+			right = mid - 1
+		} else {
+			left = mid + 1
+		}
+	}
+
+	return nil
 }
 
 // findChange find the expected change by file name
