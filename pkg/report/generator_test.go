@@ -60,12 +60,14 @@ func TestGenerateReport(t *testing.T) {
 			TotalCoveragePercent: 70,
 			CoverageProfile: []*CoverageProfile{
 				{
-					FileName:        "foo.txt",
-					CoveragePercent: 100,
+					FileName:     "foo.txt",
+					CoveredLines: 20,
+					TotalLines:   20,
 				},
 				{
 					FileName:            "bar.txt",
-					CoveragePercent:     80,
+					CoveredLines:        8,
+					TotalLines:          10,
 					TotalViolationLines: []int{2, 10},
 					ViolationSections: []*ViolationSection{
 						{
@@ -120,12 +122,14 @@ func TestProcessCodeSnippets(t *testing.T) {
 		statistics := &Statistics{
 			CoverageProfile: []*CoverageProfile{
 				{
-					FileName:        "foo.txt",
-					CoveragePercent: 100,
+					FileName:     "foo.txt",
+					CoveredLines: 20,
+					TotalLines:   20,
 				},
 				{
 					FileName:            "bar.txt",
-					CoveragePercent:     80,
+					CoveredLines:        8,
+					TotalLines:          10,
 					TotalViolationLines: []int{2, 10},
 					ViolationSections: []*ViolationSection{
 						{
@@ -235,6 +239,27 @@ func TestNormalizeLines(t *testing.T) {
 			actual := normalizeLines(testcase.input)
 			if testcase.expected != actual {
 				t.Errorf("expected %s, but get %s", testcase.expected, actual)
+			}
+		}
+	})
+}
+
+func TestPercentCovered(t *testing.T) {
+	t.Run("percentCovered", func(t *testing.T) {
+		testsuites := []struct {
+			expected float64
+			total    int
+			covered  int
+		}{
+			{expected: 100.0, total: 10, covered: 10},
+			{expected: 50.0, total: 10, covered: 5},
+			{expected: 0.0, total: 10, covered: 0},
+		}
+
+		for _, testcase := range testsuites {
+			actual := percentCovered(testcase.total, testcase.covered)
+			if testcase.expected != actual {
+				t.Errorf("expected %f, but get %f", testcase.expected, actual)
 			}
 		}
 	})

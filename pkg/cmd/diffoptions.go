@@ -1,4 +1,4 @@
-package options
+package cmd
 
 import (
 	"fmt"
@@ -54,7 +54,10 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git diff: %w", err)
 	}
 
-	diffCoverage := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch)
+	diffCoverage, err := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch)
+	if err != nil {
+		return fmt.Errorf("new diff converage: %w", err)
+	}
 	statistics, err := diffCoverage.GenerateDiffCoverage()
 	if err != nil {
 		return fmt.Errorf("diff coverage: %w", err)
@@ -65,8 +68,8 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("generate report: %w", err)
 	}
 
-	if 100-statistics.TotalCoveragePercent >= int(o.FailureRate) {
-		return fmt.Errorf("total coverage pass rate is: %d", statistics.TotalCoveragePercent)
+	if 100.0-statistics.TotalCoveragePercent >= o.FailureRate {
+		return fmt.Errorf("total coverage pass rate is: %.2f", statistics.TotalCoveragePercent)
 	}
 
 	return nil

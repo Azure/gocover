@@ -20,13 +20,23 @@ func NewDiffCoverage(
 	changes []*gittool.Change,
 	excludes []string,
 	comparedBranch string,
-) DiffCoverage {
-	return &diffCoverage{
-		comparedBranch: comparedBranch,
-		excludes:       excludes,
-		profiles:       profiles,
-		changes:        changes,
+) (DiffCoverage, error) {
+
+	var excludesRegexps []*regexp.Regexp
+	for _, ignorePattern := range excludes {
+		reg, err := regexp.Compile(ignorePattern)
+		if err != nil {
+			return nil, fmt.Errorf("compile pattern %s: %w", ignorePattern, err)
+		}
+		excludesRegexps = append(excludesRegexps, reg)
 	}
+
+	return &diffCoverage{
+		comparedBranch:  comparedBranch,
+		profiles:        profiles,
+		changes:         changes,
+		excludesRegexps: excludesRegexps,
+	}, nil
 }
 
 var _ DiffCoverage = (*diffCoverage)(nil)
@@ -34,44 +44,37 @@ var _ DiffCoverage = (*diffCoverage)(nil)
 // diffCoverage implements the DiffCoverage interface
 // and generate the diff coverage statistics
 type diffCoverage struct {
-	comparedBranch string            // git diff base branch
-	excludes       []string          // excludes files
-	profiles       []*cover.Profile  // go unit test coverage profiles
-	changes        []*gittool.Change // diff change between compared branch and HEAD commit
+	comparedBranch  string            // git diff base branch
+	profiles        []*cover.Profile  // go unit test coverage profiles
+	changes         []*gittool.Change // diff change between compared branch and HEAD commit
+	excludesRegexps []*regexp.Regexp  // excludes files regexp patterns
 }
 
 func (diff *diffCoverage) GenerateDiffCoverage() (*Statistics, error) {
-	if err := diff.ignore(); err != nil {
-		return nil, err
-	}
+	diff.ignore()
 	diff.filter()
 	return diff.percentCovered(), nil
 }
 
 // ignore files that not accountting for diff coverage
 // support standard regular expression
-func (diff *diffCoverage) ignore() error {
-	var filterProfiles []*cover.Profile
+func (diff *diffCoverage) ignore() {
+	var filteredProfiles []*cover.Profile
 
 	for _, p := range diff.profiles {
-		find := false
-		for _, ignorePattern := range diff.excludes {
-			reg, err := regexp.Compile(ignorePattern)
-			if err != nil {
-				return fmt.Errorf("compile pattern %s: %w", ignorePattern, err)
-			}
+		filter := false
+		for _, reg := range diff.excludesRegexps {
 			if reg.MatchString(p.FileName) {
-				find = true
+				filter = true
 				break
 			}
 		}
-		if !find {
-			filterProfiles = append(filterProfiles, p)
+		if !filter {
+			filteredProfiles = append(filteredProfiles, p)
 		}
 	}
 
-	diff.profiles = filterProfiles
-	return nil
+	diff.profiles = filteredProfiles
 }
 
 // filter files that no change in current HEAD commit
@@ -79,7 +82,7 @@ func (diff *diffCoverage) filter() {
 	var filterProfiles []*cover.Profile
 	for _, p := range diff.profiles {
 		for _, c := range diff.changes {
-			if strings.HasSuffix(p.FileName, c.FileName) {
+			if isSubFolderTo(p.FileName, c.FileName) {
 				filterProfiles = append(filterProfiles, p)
 			}
 		}
@@ -131,7 +134,8 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 	return &Statistics{
 		ComparedBranch:       diff.comparedBranch,
 		TotalLines:           int(totalLines),
-		TotalCoveragePercent: int(float64(totalCovered) / float64(totalLines) * 100),
+		TotalCoveredLines:    int(totalCovered),
+		TotalCoveragePercent: float64(totalCovered) / float64(totalLines) * 100,
 		TotalViolationLines:  totalViolations,
 		CoverageProfile:      coverageProfiles,
 	}
@@ -141,15 +145,12 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change) *CoverageProfile {
 	var total, covered int64
 
-	blocks := profile.Blocks
-	sort.Slice(blocks, func(i, j int) bool {
-		return blocks[i].StartLine < blocks[j].StartLine
-	})
+	sort.Sort(blocksByStart(profile.Blocks))
 
 	violationsMap := make(map[int]bool)
 	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
 	// which means that the value of NumStmt is less or equal tothe total numbers of the code block.
-	for _, b := range blocks {
+	for _, b := range profile.Blocks {
 		total += int64(b.NumStmt)
 		if b.Count > 0 {
 			covered += int64(b.NumStmt)
@@ -167,13 +168,10 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 
 	violationLines := sortLines(violationsMap)
 
-	coveredPercent := int(float64(covered) / float64(total) * 100)
-
 	coverageProfile := &CoverageProfile{
 		FileName:            change.FileName,
 		TotalLines:          int(total),
 		CoveredLines:        int(covered),
-		CoveragePercent:     coveredPercent,
 		TotalViolationLines: violationLines,
 		ViolationSections: []*ViolationSection{
 			{
@@ -191,10 +189,7 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 // generateCoverageProfileWithModifyMode generates for modify file
 func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gittool.Change) *CoverageProfile {
 
-	blocks := profile.Blocks
-	sort.Slice(blocks, func(i, j int) bool {
-		return blocks[i].StartLine < blocks[j].StartLine
-	})
+	sort.Sort(blocksByStart(profile.Blocks))
 
 	var total, covered int64
 	var totalViolationLines []int
@@ -205,13 +200,13 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 
 		var violationLines []int
 		for lineNo := section.StartLine; lineNo <= section.EndLine; lineNo++ {
-			block := binarySeachForProfileBlock(blocks, 0, len(blocks)-1, lineNo)
+
+			block := findProfileBlock(profile.Blocks, lineNo)
 			if block == nil {
 				continue
 			}
 
 			// check line?
-
 			total++
 			if block.Count > 0 {
 				covered++
@@ -238,41 +233,46 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 		return nil
 	}
 
-	coveredPercent := int(float64(covered) / float64(total) * 100)
-
 	return &CoverageProfile{
 		FileName:            change.FileName,
 		TotalLines:          int(total),
 		CoveredLines:        int(covered),
-		CoveragePercent:     coveredPercent,
 		TotalViolationLines: totalViolationLines,
 		ViolationSections:   violationSections,
 	}
 }
 
-func binarySeachForProfileBlock(blocks []cover.ProfileBlock, left int, right int, lineNo int) *cover.ProfileBlock {
+// findProfileBlock find the expected profile block by line number.
+// as a profile block has start line and end line, we use binary search to search for it using start line first,
+// then validate the end line.
+func findProfileBlock(blocks []cover.ProfileBlock, lineNo int) *cover.ProfileBlock {
+	idx := sort.Search(len(blocks), func(i int) bool {
+		return blocks[i].StartLine >= lineNo
+	})
 
-	var mid int
-	for left <= right {
-		mid = (left + right) >> 1
-		// current line is in this block
-		if blocks[mid].StartLine <= lineNo && blocks[mid].EndLine >= lineNo {
-			return &blocks[mid]
-		}
-		if blocks[mid].StartLine > lineNo {
-			right = mid - 1
+	// no suitable block, index is out of range
+	if idx == len(blocks) {
+		idx--
+		if blocks[idx].StartLine <= lineNo && blocks[idx].EndLine >= lineNo {
+			return &blocks[idx]
 		} else {
-			left = mid + 1
+			return nil
 		}
 	}
 
+	for idx >= 0 {
+		if blocks[idx].StartLine <= lineNo && blocks[idx].EndLine >= lineNo {
+			return &blocks[idx]
+		}
+		idx--
+	}
 	return nil
 }
 
-// findChange find the expected change by file name
+// findChange find the expected change by file name.
 func findChange(profile *cover.Profile, changes []*gittool.Change) *gittool.Change {
 	for _, change := range changes {
-		if strings.HasSuffix(profile.FileName, change.FileName) {
+		if isSubFolderTo(profile.FileName, change.FileName) {
 			return change
 		}
 	}
@@ -289,18 +289,17 @@ func sortLines(m map[int]bool) []int {
 	return lines
 }
 
-// returns the maximum value between two int values.
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+// isSubFolderTo check whether specified filepath is a part of parent path.
+func isSubFolderTo(parentDir, filepath string) bool {
+	return strings.HasSuffix(parentDir, filepath)
 }
 
-// returns the minimum value between two int values.
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+// interface for sorting profile block slice by start line
+type blocksByStart []cover.ProfileBlock
+
+func (b blocksByStart) Len() int      { return len(b) }
+func (b blocksByStart) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b blocksByStart) Less(i, j int) bool {
+	bi, bj := b[i], b[j]
+	return bi.StartLine < bj.StartLine || bi.StartLine == bj.StartLine && bi.StartCol < bj.StartCol
 }

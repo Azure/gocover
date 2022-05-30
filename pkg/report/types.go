@@ -11,10 +11,12 @@ type Statistics struct {
 	ComparedBranch string
 	// TotalLines represents the total lines that count for coverage.
 	TotalLines int
+	// TotalCoveredLines indicates total covered lines that count for coverage.
+	TotalCoveredLines int
 	// TotalViolationLines represents all the lines that miss test coverage.
 	TotalViolationLines int
 	// TotalCoveragePercent represents the coverage percent for current diff.
-	TotalCoveragePercent int
+	TotalCoveragePercent float64
 	// CoverageProfile represents the coverage profile for a specific file.
 	CoverageProfile []*CoverageProfile
 }
@@ -25,11 +27,9 @@ type CoverageProfile struct {
 	FileName string
 	// TotalLines indicates total lines of this coverage profile.
 	TotalLines int
-	// CoveredLines indicates covered lines of thie coverage profile.
+	// CoveredLines indicates covered lines of this coverage profile.
 	CoveredLines int
 	// CoveragePercent indicates the diff coverage percent for this file.
-	CoveragePercent int
-	// TotalViolationLines indicates the total lines that miss full coverage.
 	TotalViolationLines []int
 	// ViolationSections indicates the violation sections that miss full coverage.
 	ViolationSections []*ViolationSection

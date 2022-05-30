@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -96,7 +97,7 @@ func (g *htmlReportGenerator) processCodeSnippets() error {
 
 	// each file has a coverage profile, and each coverage profile may have zero to many violation sections.
 	for _, profile := range g.statistics.CoverageProfile {
-		if profile.CoveragePercent == 100 {
+		if profile.CoveredLines == profile.TotalLines {
 			continue
 		}
 
@@ -143,6 +144,7 @@ var htmlCoverageReportTemplate = template.Must(
 	template.New("htmlReportTemplate").
 		Funcs(template.FuncMap{"IntsJoin": intsJoin}).
 		Funcs(template.FuncMap{"NormalizeLines": normalizeLines}).
+		Funcs(template.FuncMap{"PercentCovered": percentCovered}).
 		Parse(htmlCoverageReport),
 )
 
@@ -162,4 +164,10 @@ func normalizeLines(lines int) string {
 	} else {
 		return fmt.Sprintf("%d lines", lines)
 	}
+}
+
+func percentCovered(total, covered int) float64 {
+	c := float64(covered) / float64(total) * 100
+	percent, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", c), 64)
+	return percent
 }

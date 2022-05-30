@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/Azure/gocover/pkg/options"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +22,7 @@ gocover --cover-profile=coverage.out --compare-branch=origin/master --format htm
 
 // NewGoCoverCommand creates a command object for generating diff coverage reporter.
 func NewGoCoverCommand() *cobra.Command {
-	o := options.NewDiffOptions()
+	o := NewDiffOptions()
 
 	cmd := &cobra.Command{
 		Use:     "gocover",

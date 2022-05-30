@@ -1,6 +1,7 @@
 package report
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -11,7 +12,22 @@ import (
 
 func TestDiffCoverage(t *testing.T) {
 	t.Run("NewDiffCoverage", func(t *testing.T) {
-		diff := NewDiffCoverage([]*cover.Profile{}, []*gittool.Change{}, []string{}, "testbranch")
+		_, err := NewDiffCoverage([]*cover.Profile{}, []*gittool.Change{}, []string{"**"}, "testbranch")
+		if err == nil {
+			t.Error("should return error")
+		}
+
+		diff, err := NewDiffCoverage(
+			[]*cover.Profile{},
+			[]*gittool.Change{},
+			[]string{
+				".*github.com/Azure/gocover/report/tool.go",
+				"github.com/Azure/gocover/test/.*",
+				"github.com/Azure/gocover/mock_*",
+			}, "testbranch")
+		if err != nil {
+			t.Errorf("should not return error: %s", err)
+		}
 		if diff == nil {
 			t.Error("should not nil")
 		}
@@ -173,8 +189,8 @@ func TestDiffCoverage(t *testing.T) {
 				if statistics.TotalLines != 12 {
 					t.Errorf("total lines should be 12, but get %d", statistics.TotalLines)
 				}
-				if statistics.TotalCoveragePercent != 50 {
-					t.Errorf("coverage percent shoud be 50, but get %d", statistics.TotalCoveragePercent)
+				if statistics.TotalCoveragePercent != 50.0 {
+					t.Errorf("coverage percent shoud be 50, but get %f", statistics.TotalCoveragePercent)
 				}
 				if statistics.TotalViolationLines != 6 {
 					t.Errorf("total violation lines should be 6, but get %d", statistics.TotalViolationLines)
@@ -182,21 +198,6 @@ func TestDiffCoverage(t *testing.T) {
 				if len(statistics.CoverageProfile) != 2 {
 					t.Errorf("should have 2 coverage profile, but get: %d", len(statistics.CoverageProfile))
 				}
-			}
-		})
-
-		t.Run("ignore error", func(t *testing.T) {
-			diff := &diffCoverage{
-				profiles: []*cover.Profile{
-					{
-						FileName: "github.com/Azure/gocover/report/tool.go",
-					},
-				},
-				excludes: []string{"**"},
-			}
-
-			if _, err := diff.GenerateDiffCoverage(); err == nil {
-				t.Error("regexp should fail to compile")
 			}
 		})
 	})
@@ -218,37 +219,24 @@ func TestDiffCoverage(t *testing.T) {
 						FileName: "github.com/Azure/gocover/utils/common.go",
 					},
 				},
-				excludes: []string{
-					".*github.com/Azure/gocover/report/tool.go",
-					"github.com/Azure/gocover/test/.*",
-					"github.com/Azure/gocover/mock_*",
-				},
 			}
 
-			if err := diff.ignore(); err != nil {
-				t.Errorf("should not error, but get: %s", err)
+			for _, p := range []string{
+				".*github.com/Azure/gocover/report/tool.go",
+				"github.com/Azure/gocover/test/.*",
+				"github.com/Azure/gocover/mock_*",
+			} {
+				reg := regexp.MustCompile(p)
+				diff.excludesRegexps = append(diff.excludesRegexps, reg)
 			}
+
+			diff.ignore()
 
 			if len(diff.profiles) != 1 {
 				t.Errorf("after ignore, should have 1 profile, but get: %d", len(diff.profiles))
 			}
 			if diff.profiles[0].FileName != "github.com/Azure/gocover/utils/common.go" {
 				t.Errorf("after ignore, only common.go is left, but get: %s", diff.profiles[0].FileName)
-			}
-		})
-
-		t.Run("wrong pattern", func(t *testing.T) {
-			diff := &diffCoverage{
-				profiles: []*cover.Profile{
-					{
-						FileName: "github.com/Azure/gocover/report/tool.go",
-					},
-				},
-				excludes: []string{"**"},
-			}
-
-			if err := diff.ignore(); err == nil {
-				t.Error("regexp should fail to compile")
 			}
 		})
 	})
@@ -437,8 +425,8 @@ func TestDiffCoverage(t *testing.T) {
 			if statistics.TotalLines != 12 {
 				t.Errorf("total lines should be 12, but get %d", statistics.TotalLines)
 			}
-			if statistics.TotalCoveragePercent != 50 {
-				t.Errorf("coverage percent shoud be 50, but get %d", statistics.TotalCoveragePercent)
+			if statistics.TotalCoveragePercent != 50.0 {
+				t.Errorf("coverage percent shoud be 50, but get %f", statistics.TotalCoveragePercent)
 			}
 			if statistics.TotalViolationLines != 6 {
 				t.Errorf("total violation lines should be 6, but get %d", statistics.TotalViolationLines)
@@ -501,8 +489,9 @@ func TestGenerateCoverageProfileWithModifyMode(t *testing.T) {
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
 		}
-		if coverageProfile.CoveragePercent != 50 {
-			t.Errorf("coverage percent shoud be 50, but get %d", coverageProfile.CoveragePercent)
+		c := float64(coverageProfile.CoveredLines) / float64(coverageProfile.TotalLines) * 100
+		if c != 50.0 {
+			t.Errorf("coverage percent shoud be 50, but get %f", c)
 		}
 		if coverageProfile.TotalLines != 6 {
 			t.Errorf("total lines should be 6, but get %d", coverageProfile.TotalLines)
@@ -583,8 +572,9 @@ func TestGenerateCoverageProfileWithNewMode(t *testing.T) {
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
 		}
-		if coverageProfile.CoveragePercent != 50 {
-			t.Errorf("coverage percent shoud be 50, but get %d", coverageProfile.CoveragePercent)
+		c := float64(coverageProfile.CoveredLines) / float64(coverageProfile.TotalLines) * 100
+		if c != 50.0 {
+			t.Errorf("coverage percent shoud be 50, but get %f", c)
 		}
 		if coverageProfile.TotalLines != 6 {
 			t.Errorf("total lines should be 6, but get %d", coverageProfile.TotalLines)
@@ -686,66 +676,28 @@ func TestSortLines(t *testing.T) {
 	})
 }
 
-func TestMaxInt(t *testing.T) {
-	t.Run("maxInt", func(t *testing.T) {
+func TestIsSubFolderTo(t *testing.T) {
+	t.Run("isSubFolderTo", func(t *testing.T) {
 		testsuites := []struct {
-			input  []int
-			expect int
+			parentDir string
+			filepath  string
+			expected  bool
 		}{
-			{
-				input:  []int{1, 1},
-				expect: 1,
-			},
-			{
-				input:  []int{1, 2},
-				expect: 2,
-			},
-			{
-				input:  []int{2, 1},
-				expect: 2,
-			},
+			{parentDir: "github.com/Azure/gocover/report/tool.go", filepath: "utils/common.go", expected: false},
+			{parentDir: "github.com/Azure/gocover/report/tool.go", filepath: "report/tool.go", expected: true},
 		}
 
 		for _, testcase := range testsuites {
-			actual := maxInt(testcase.input[0], testcase.input[1])
-			if actual != testcase.expect {
-				t.Errorf("expect %d, but get %d", testcase.expect, actual)
+			actual := isSubFolderTo(testcase.parentDir, testcase.filepath)
+			if actual != testcase.expected {
+				t.Errorf("expected %t, but get %t", testcase.expected, actual)
 			}
 		}
 	})
 }
 
-func TestMinInt(t *testing.T) {
-	t.Run("minInt", func(t *testing.T) {
-		testsuites := []struct {
-			input  []int
-			expect int
-		}{
-			{
-				input:  []int{1, 1},
-				expect: 1,
-			},
-			{
-				input:  []int{1, 2},
-				expect: 1,
-			},
-			{
-				input:  []int{2, 1},
-				expect: 1,
-			},
-		}
-
-		for _, testcase := range testsuites {
-			actual := minInt(testcase.input[0], testcase.input[1])
-			if actual != testcase.expect {
-				t.Errorf("expect %d, but get %d", testcase.expect, actual)
-			}
-		}
-	})
-}
-
-func TestBinarySeachForProfileBlock(t *testing.T) {
-	t.Run("binarySeachForProfileBlock", func(t *testing.T) {
+func TestFindProfileBlock(t *testing.T) {
+	t.Run("findProfileBlock", func(t *testing.T) {
 		block0 := cover.ProfileBlock{StartLine: 1, EndLine: 3}
 		block1 := cover.ProfileBlock{StartLine: 3, EndLine: 5}
 		block2 := cover.ProfileBlock{StartLine: 7, EndLine: 7}
@@ -772,7 +724,7 @@ func TestBinarySeachForProfileBlock(t *testing.T) {
 		}
 
 		for _, testcase := range testsuites {
-			actual := binarySeachForProfileBlock(blocks, 0, len(blocks)-1, testcase.input)
+			actual := findProfileBlock(blocks, testcase.input)
 			if actual != testcase.expect {
 				t.Errorf("expect %v, but get %v", testcase.expect, actual)
 			}
