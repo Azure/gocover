@@ -44,7 +44,7 @@ var htmlCoverageReport = `
           {{ range .CoverageProfile }}
             <tr>
               <td>{{ .FileName }}</td>
-              <td>{{ .CoveragePercent }}</td>
+              <td>{{ PercentCovered .TotalLines .CoveredLines }}</td>
               <td>{{ IntsJoin .TotalViolationLines }}</td>
             </tr>
           {{ end }}
@@ -53,7 +53,7 @@ var htmlCoverageReport = `
 
         {{ range .CoverageProfile }}
           <div class="src-snippet">
-          {{ if lt .CoveragePercent 100 }}
+          {{ if lt (PercentCovered .TotalLines .CoveredLines) 100.0 }}
             <div class="src-name">{{ .FileName }}</div>
             <div class="snippets">
               {{range .CodeSnippet}} 

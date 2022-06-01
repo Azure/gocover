@@ -13,7 +13,7 @@ import (
 
 func TestNewReportGenerator(t *testing.T) {
 	t.Run("NewReportGenerator", func(t *testing.T) {
-		NewReportGenerator(&Statistics{}, "colorful")
+		NewReportGenerator(&Statistics{}, "colorful", "", "")
 	})
 }
 
@@ -37,7 +37,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, g.reportName))
+		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -60,12 +60,14 @@ func TestGenerateReport(t *testing.T) {
 			TotalCoveragePercent: 70,
 			CoverageProfile: []*CoverageProfile{
 				{
-					FileName:        "foo.txt",
-					CoveragePercent: 100,
+					FileName:     "foo.txt",
+					CoveredLines: 20,
+					TotalLines:   20,
 				},
 				{
 					FileName:            "bar.txt",
-					CoveragePercent:     80,
+					CoveredLines:        8,
+					TotalLines:          10,
 					TotalViolationLines: []int{2, 10},
 					ViolationSections: []*ViolationSection{
 						{
@@ -98,7 +100,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, g.reportName))
+		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -120,12 +122,14 @@ func TestProcessCodeSnippets(t *testing.T) {
 		statistics := &Statistics{
 			CoverageProfile: []*CoverageProfile{
 				{
-					FileName:        "foo.txt",
-					CoveragePercent: 100,
+					FileName:     "foo.txt",
+					CoveredLines: 20,
+					TotalLines:   20,
 				},
 				{
 					FileName:            "bar.txt",
-					CoveragePercent:     80,
+					CoveredLines:        8,
+					TotalLines:          10,
 					TotalViolationLines: []int{2, 10},
 					ViolationSections: []*ViolationSection{
 						{
@@ -201,6 +205,25 @@ func TestIntsJoin(t *testing.T) {
 	})
 }
 
+func TestFinalName(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		testsuites := []struct {
+			expected string
+			input    string
+		}{
+			{input: "a", expected: "a.html"},
+			{input: "b", expected: "b.html"},
+			{input: "c", expected: "c.html"},
+		}
+		for _, testcase := range testsuites {
+			actual := finalName(testcase.input)
+			if testcase.expected != actual {
+				t.Errorf("expected %s, but get %s", testcase.expected, actual)
+			}
+		}
+	})
+}
+
 func TestNormalizeLines(t *testing.T) {
 	t.Run("normalizeLines", func(t *testing.T) {
 		testsuites := []struct {
@@ -216,6 +239,27 @@ func TestNormalizeLines(t *testing.T) {
 			actual := normalizeLines(testcase.input)
 			if testcase.expected != actual {
 				t.Errorf("expected %s, but get %s", testcase.expected, actual)
+			}
+		}
+	})
+}
+
+func TestPercentCovered(t *testing.T) {
+	t.Run("percentCovered", func(t *testing.T) {
+		testsuites := []struct {
+			expected float64
+			total    int
+			covered  int
+		}{
+			{expected: 100.0, total: 10, covered: 10},
+			{expected: 50.0, total: 10, covered: 5},
+			{expected: 0.0, total: 10, covered: 0},
+		}
+
+		for _, testcase := range testsuites {
+			actual := percentCovered(testcase.total, testcase.covered)
+			if testcase.expected != actual {
+				t.Errorf("expected %f, but get %f", testcase.expected, actual)
 			}
 		}
 	})

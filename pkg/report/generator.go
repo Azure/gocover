@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -46,6 +47,8 @@ const (
 func NewReportGenerator(
 	statistics *Statistics,
 	codeStyle string,
+	outputPath string,
+	reportName string,
 ) ReportGenerator {
 	style := styles.Get(codeStyle)
 	if style == nil {
@@ -61,6 +64,8 @@ func NewReportGenerator(
 		lexer:      lexer,
 		statistics: statistics,
 		style:      style,
+		outputPath: outputPath,
+		reportName: reportName,
 	}
 }
 
@@ -72,7 +77,7 @@ func (g *htmlReportGenerator) GenerateReport() error {
 		return fmt.Errorf("process code snippets: %w", err)
 	}
 
-	reportFile := filepath.Join(g.outputPath, g.reportName)
+	reportFile := filepath.Join(g.outputPath, finalName(g.reportName))
 	f, err := os.Create(reportFile)
 	if err != nil {
 		return fmt.Errorf("create report file: %w", err)
@@ -92,7 +97,7 @@ func (g *htmlReportGenerator) processCodeSnippets() error {
 
 	// each file has a coverage profile, and each coverage profile may have zero to many violation sections.
 	for _, profile := range g.statistics.CoverageProfile {
-		if profile.CoveragePercent == 100 {
+		if profile.CoveredLines == profile.TotalLines {
 			continue
 		}
 
@@ -130,11 +135,16 @@ func (g *htmlReportGenerator) processCodeSnippets() error {
 	return nil
 }
 
+func finalName(reportName string) string {
+	return fmt.Sprintf("%s.html", reportName)
+}
+
 // htmlCoverageReportTemplate is the render engine for html coverage report.
 var htmlCoverageReportTemplate = template.Must(
 	template.New("htmlReportTemplate").
 		Funcs(template.FuncMap{"IntsJoin": intsJoin}).
 		Funcs(template.FuncMap{"NormalizeLines": normalizeLines}).
+		Funcs(template.FuncMap{"PercentCovered": percentCovered}).
 		Parse(htmlCoverageReport),
 )
 
@@ -154,4 +164,10 @@ func normalizeLines(lines int) string {
 	} else {
 		return fmt.Sprintf("%d lines", lines)
 	}
+}
+
+func percentCovered(total, covered int) float64 {
+	c := float64(covered) / float64(total) * 100
+	percent, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", c), 64)
+	return percent
 }
