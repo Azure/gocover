@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/Azure/gocover/pkg/report"
 	"github.com/spf13/cobra"
+	"golang.org/x/tools/cover"
 )
 
 // TODO: improve this description.
@@ -47,6 +49,37 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
 
+	cmd.MarkFlagRequired("cover-profile")
+
+	cmd.AddCommand(newFullCoverageCommand())
+	return cmd
+}
+
+func newFullCoverageCommand() *cobra.Command {
+	var (
+		coverProfile   string
+		moduleHostPath string
+	)
+	cmd := &cobra.Command{
+		Use: "full",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			profiles, err := cover.ParseProfiles(coverProfile)
+			if err != nil {
+				return fmt.Errorf("parse %s: %s", coverProfile, err)
+			}
+
+			fullCoverage, err := report.NewFullCoverage(profiles, moduleHostPath, []string{})
+			if err != nil {
+				return fmt.Errorf("new full coverage: %s", err)
+			}
+
+			fullCoverage.BuildFullCoverageTree()
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&coverProfile, "cover-profile", "", `coverage profile produced by 'go test'`)
+	cmd.Flags().StringVar(&moduleHostPath, "host-path", "", "host path for the go project")
 	cmd.MarkFlagRequired("cover-profile")
 
 	return cmd
