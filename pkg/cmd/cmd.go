@@ -27,10 +27,11 @@ func NewGoCoverCommand() *cobra.Command {
 	o := NewDiffOptions()
 
 	cmd := &cobra.Command{
-		Use:     "gocover",
-		Short:   "Generate unit test diff coverage for go code",
-		Long:    getLong,
-		Example: getExample,
+		Use:          "gocover",
+		Short:        "Generate unit test diff coverage for go code",
+		Long:         getLong,
+		Example:      getExample,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := o.Run(cmd, args); err != nil {
 				return fmt.Errorf("generate diff coverage %w", err)

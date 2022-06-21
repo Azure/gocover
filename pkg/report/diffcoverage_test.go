@@ -36,6 +36,7 @@ func TestDiffCoverage(t *testing.T) {
 	t.Run("GenerateDiffCoverage", func(t *testing.T) {
 		t.Run("generate percent coverage", func(t *testing.T) {
 			diff := &diffCoverage{
+				coverageTree:   NewCoverageTree(""),
 				comparedBranch: "origin/main",
 				profiles: []*cover.Profile{
 					{
@@ -275,6 +276,7 @@ func TestDiffCoverage(t *testing.T) {
 
 	t.Run("percentCovered", func(t *testing.T) {
 		diff := &diffCoverage{
+			coverageTree:   NewCoverageTree(""),
 			comparedBranch: "origin/main",
 			profiles: []*cover.Profile{
 				{

@@ -133,13 +133,18 @@ func TestCoverageTree(t *testing.T) {
 	t.Run("All", func(t *testing.T) {
 		beforeRun()
 
-		coverageTree := &coverageTree{
-			ModuleHostPath: "github.com/Azure/gocover",
-			Root:           root,
+		coverageTree := &coverageTree{}
+		coverageTree.CollectCoverageData()
+		all := coverageTree.All()
+		if len(all) != 0 {
+			t.Errorf("should have 0 items, but get %d", len(all))
 		}
+
+		coverageTree.ModuleHostPath = ""
+		coverageTree.Root = root
 		coverageTree.CollectCoverageData()
 
-		all := coverageTree.All()
+		all = coverageTree.All()
 		if len(all) != 8 {
 			t.Errorf("should have 8 items, but get %d", len(all))
 		}

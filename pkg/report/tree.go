@@ -3,8 +3,6 @@ package report
 import (
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/tools/cover"
 )
 
 const (
@@ -18,6 +16,7 @@ type CoverageTree interface {
 	Find(pkgPath string) *TreeNode
 	CollectCoverageData()
 	All() []*AllInformation
+	Statistics() *AllInformation
 }
 
 type Tree *TreeNode
@@ -28,10 +27,11 @@ type Tree *TreeNode
 // Each internal node has one or many sub node, which is stored in a map, and can be retrieved by node name.
 // For the leaf node, it does not have sub node.
 type TreeNode struct {
-	Name                string               // name
-	TotalLines          int64                // total lines account for coverage
-	TotalCoveredLines   int64                // covered lines account for coverage
-	TotalViolationLines int64                // violation lines that not covered for coverage
+	Name                string // name
+	TotalLines          int64  // total lines account for coverage
+	TotalCoveredLines   int64  // covered lines account for coverage
+	TotalViolationLines int64  // violation lines that not covered for coverage
+	CoverageProfile     *CoverageProfile
 	Nodes               map[string]*TreeNode // sub nodes that store in map
 	isLeaf              bool                 // whether the node is leaf or internal node
 }
@@ -41,23 +41,6 @@ func NewCoverageTree(hostpath string) CoverageTree {
 		ModuleHostPath: hostpath,
 		Root:           NewTreeNode(hostpath, false),
 	}
-}
-
-func NewCoverageTreeFromProfiles(hostpath string, profiles []*cover.Profile) CoverageTree {
-	coverageTree := NewCoverageTree(hostpath)
-
-	for _, profile := range profiles {
-		node := coverageTree.FindOrCreate(profile.FileName)
-		for _, b := range profile.Blocks {
-			node.TotalLines += int64(b.NumStmt)
-			if b.Count > 0 {
-				node.TotalCoveredLines += int64(b.NumStmt)
-			}
-		}
-	}
-
-	coverageTree.CollectCoverageData()
-	return coverageTree
 }
 
 func NewTreeNode(name string, isLeaf bool) *TreeNode {
@@ -76,9 +59,19 @@ type coverageTree struct {
 var _ CoverageTree = (*coverageTree)(nil)
 
 type AllInformation struct {
-	Path              string
-	TotalLines        int64
-	TotalCoveredLines int64
+	Path                string
+	TotalLines          int64
+	TotalCoveredLines   int64
+	TotalViolationLines int64
+}
+
+func (p *coverageTree) Statistics() *AllInformation {
+	return &AllInformation{
+		Path:                p.Root.Name,
+		TotalLines:          p.Root.TotalLines,
+		TotalCoveredLines:   p.Root.TotalCoveredLines,
+		TotalViolationLines: p.Root.TotalViolationLines,
+	}
 }
 
 func (p *coverageTree) All() []*AllInformation {
@@ -96,9 +89,10 @@ func (p *coverageTree) All() []*AllInformation {
 		}
 
 		result = append(result, &AllInformation{
-			Path:              fullpathname,
-			TotalLines:        root.TotalLines,
-			TotalCoveredLines: root.TotalCoveredLines,
+			Path:                fullpathname,
+			TotalLines:          root.TotalLines,
+			TotalCoveredLines:   root.TotalCoveredLines,
+			TotalViolationLines: root.TotalViolationLines,
 		})
 
 		for _, v := range root.Nodes {

@@ -8,7 +8,7 @@ import (
 )
 
 type FullCoverage interface {
-	BuildFullCoverageTree()
+	BuildFullCoverageTree() []*AllInformation
 }
 
 func NewFullCoverage(
@@ -34,7 +34,6 @@ func NewFullCoverage(
 			Root:           NewTreeNode(moduleHostPath, false),
 		},
 	}, nil
-
 }
 
 var _ FullCoverage = (*fullCoverage)(nil)
@@ -45,18 +44,10 @@ type fullCoverage struct {
 	coverageTree    CoverageTree
 }
 
-func (full *fullCoverage) BuildFullCoverageTree() {
+func (full *fullCoverage) BuildFullCoverageTree() []*AllInformation {
 	full.ignore()
 	full.covered()
-	all := full.coverageTree.All()
-	for _, v := range all {
-		fmt.Println(
-			v.Path,
-			v.TotalLines,
-			v.TotalCoveredLines,
-			fmt.Sprintf("%.2f %%", float64(v.TotalCoveredLines)/float64(v.TotalLines)*100),
-		)
-	}
+	return full.coverageTree.All()
 }
 
 func (full *fullCoverage) ignore() {
