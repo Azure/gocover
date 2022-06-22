@@ -36,7 +36,9 @@ func NewDiffCoverage(
 		profiles:        profiles,
 		changes:         changes,
 		excludesRegexps: excludesRegexps,
+		coverageTree:    NewCoverageTree(""),
 	}, nil
+
 }
 
 var _ DiffCoverage = (*diffCoverage)(nil)
@@ -48,6 +50,7 @@ type diffCoverage struct {
 	profiles        []*cover.Profile  // go unit test coverage profiles
 	changes         []*gittool.Change // diff change between compared branch and HEAD commit
 	excludesRegexps []*regexp.Regexp  // excludes files regexp patterns
+	coverageTree    CoverageTree
 }
 
 func (diff *diffCoverage) GenerateDiffCoverage() (*Statistics, error) {
@@ -94,10 +97,6 @@ func (diff *diffCoverage) filter() {
 // using go unit test covreage profile and diff changes between two commits.
 func (diff *diffCoverage) percentCovered() *Statistics {
 
-	var totalLines int64 = 0
-	var totalCovered int64 = 0
-	totalViolations := 0
-
 	var coverageProfiles []*CoverageProfile
 	for _, p := range diff.profiles {
 
@@ -112,9 +111,11 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 			if coverageProfile := generateCoverageProfileWithNewMode(p, change); coverageProfile != nil {
 				coverageProfiles = append(coverageProfiles, coverageProfile)
 
-				totalViolations += len(coverageProfile.TotalViolationLines)
-				totalLines += int64(coverageProfile.TotalLines)
-				totalCovered += int64(coverageProfile.CoveredLines)
+				node := diff.coverageTree.FindOrCreate(change.FileName)
+				node.TotalLines += int64(coverageProfile.TotalLines)
+				node.TotalCoveredLines += int64(coverageProfile.CoveredLines)
+				node.TotalViolationLines += int64(len(coverageProfile.TotalViolationLines))
+				node.CoverageProfile = coverageProfile
 			}
 
 		case gittool.ModifyMode:
@@ -122,21 +123,26 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 			coverageProfile := generateCoverageProfileWithModifyMode(p, change)
 			coverageProfiles = append(coverageProfiles, coverageProfile)
 
-			totalViolations += len(coverageProfile.TotalViolationLines)
-			totalLines += int64(coverageProfile.TotalLines)
-			totalCovered += int64(coverageProfile.CoveredLines)
+			node := diff.coverageTree.FindOrCreate(change.FileName)
+			node.TotalLines += int64(coverageProfile.TotalLines)
+			node.TotalCoveredLines += int64(coverageProfile.CoveredLines)
+			node.TotalViolationLines += int64(len(coverageProfile.TotalViolationLines))
+			node.CoverageProfile = coverageProfile
 
 		case gittool.RenameMode:
 		case gittool.DeleteMode:
 		}
 	}
 
+	diff.coverageTree.CollectCoverageData()
+	all := diff.coverageTree.Statistics()
+
 	return &Statistics{
 		ComparedBranch:       diff.comparedBranch,
-		TotalLines:           int(totalLines),
-		TotalCoveredLines:    int(totalCovered),
-		TotalCoveragePercent: float64(totalCovered) / float64(totalLines) * 100,
-		TotalViolationLines:  totalViolations,
+		TotalLines:           int(all.TotalLines),
+		TotalCoveredLines:    int(all.TotalCoveredLines),
+		TotalCoveragePercent: float64(all.TotalCoveredLines) / float64(all.TotalLines) * 100,
+		TotalViolationLines:  int(all.TotalViolationLines),
 		CoverageProfile:      coverageProfiles,
 	}
 }
