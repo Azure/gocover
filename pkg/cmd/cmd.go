@@ -76,7 +76,7 @@ func newFullCoverageCommand() *cobra.Command {
 
 			all := fullCoverage.BuildFullCoverageTree()
 			for _, info := range all {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %.1f%%",
+				fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %.1f%%\n",
 					info.Path,
 					info.TotalCoveredLines,
 					info.TotalLines,
