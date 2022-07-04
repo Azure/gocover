@@ -120,14 +120,15 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 		case gittool.ModifyMode:
 
-			coverageProfile := generateCoverageProfileWithModifyMode(p, change)
-			coverageProfiles = append(coverageProfiles, coverageProfile)
+			if coverageProfile := generateCoverageProfileWithModifyMode(p, change); coverageProfile != nil {
+				coverageProfiles = append(coverageProfiles, coverageProfile)
 
-			node := diff.coverageTree.FindOrCreate(change.FileName)
-			node.TotalLines += int64(coverageProfile.TotalLines)
-			node.TotalCoveredLines += int64(coverageProfile.CoveredLines)
-			node.TotalViolationLines += int64(len(coverageProfile.TotalViolationLines))
-			node.CoverageProfile = coverageProfile
+				node := diff.coverageTree.FindOrCreate(change.FileName)
+				node.TotalLines += int64(coverageProfile.TotalLines)
+				node.TotalCoveredLines += int64(coverageProfile.CoveredLines)
+				node.TotalViolationLines += int64(len(coverageProfile.TotalViolationLines))
+				node.CoverageProfile = coverageProfile
+			}
 
 		case gittool.RenameMode:
 		case gittool.DeleteMode:
