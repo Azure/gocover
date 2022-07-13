@@ -2,10 +2,12 @@ package report
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/gittool"
 	"golang.org/x/tools/cover"
 )
@@ -20,6 +22,7 @@ func NewDiffCoverage(
 	changes []*gittool.Change,
 	excludes []string,
 	comparedBranch string,
+	repositoryPath string,
 ) (DiffCoverage, error) {
 
 	var excludesRegexps []*regexp.Regexp
@@ -31,12 +34,23 @@ func NewDiffCoverage(
 		excludesRegexps = append(excludesRegexps, reg)
 	}
 
+	ignoreProfiles := make(map[string]*annotation.IgnoreProfile)
+	for _, c := range changes {
+		ignoreProfile, err := annotation.ParseIgnoreProfiles(filepath.Join(repositoryPath, c.FileName))
+		if err == nil {
+			ignoreProfiles[c.FileName] = ignoreProfile
+		} else {
+			fmt.Printf("warn: %s\n", err)
+		}
+	}
+
 	return &diffCoverage{
 		comparedBranch:  comparedBranch,
 		profiles:        profiles,
 		changes:         changes,
 		excludesRegexps: excludesRegexps,
 		coverageTree:    NewCoverageTree(""),
+		ignoreProfiles:  ignoreProfiles,
 	}, nil
 
 }
@@ -50,6 +64,7 @@ type diffCoverage struct {
 	profiles        []*cover.Profile  // go unit test coverage profiles
 	changes         []*gittool.Change // diff change between compared branch and HEAD commit
 	excludesRegexps []*regexp.Regexp  // excludes files regexp patterns
+	ignoreProfiles  map[string]*annotation.IgnoreProfile
 	coverageTree    CoverageTree
 }
 
@@ -102,6 +117,11 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 		change := findChange(p, diff.changes)
 		if change == nil {
+			continue
+		}
+
+		ignoreProfile, ok := diff.ignoreProfiles[change.FileName]
+		if ok && ignoreProfile.Type == annotation.ALL_IGNORE {
 			continue
 		}
 
