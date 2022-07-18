@@ -5,59 +5,29 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"strconv"
-	"strings"
+
+	"golang.org/x/tools/cover"
 )
 
 var (
-	// IgnoreRegexp finds the gocover ignore pattern.
-	// Three kind ignore pattern are supported:
-	//   //+gocover:ignore:all
-	//   //+gocover:ignore:block
-	//   //+gocover:ignore:{number}
-	//
-	// - `//+gocover:ignore:all`
-	//   will ignore the whole file, the file won't be used to calculate coverage.
-	//
+	// IgnoreRegexp the regexp for the gocover ignore pattern.
+	// Two kinds of ignore pattern are supported:
+	// - `//+gocover:ignore:file`
 	// - `//+gocover:ignore:block`
-	//   will ignore a code block, the code block won't be used to calculate coverage.
-	//   code block is the code that have many non-blank lines until it meet a blank line.
-	//   for example:
-	//       pf, err := os.Open(fileName)  -|
-	//       if err != nil {                |
-	// 	         return nil, err            | -> code block
-	//       }                              |
-	//       defer pf.Close()              -|
 	//
-	//       profile, err := parseIgnoreProfilesFromReader(pf) -|
-	//       profile.Filename = fileName                        | -> code block
-	//       return profile, err                               -|
-	//
-	// - `//+gocover:ignore:{number}`
-	//    will ignore the specific code lines, and the code won't be used to calculate coverage.
-	//    for example:
-	//       //+gocover:ignore:5
-	//       pf, err := os.Open(fileName)  -|
-	//       if err != nil {                |
-	// 	         return nil, err            | -> these 5 lines will be ignored
-	//       }                              |
-	//       defer pf.Close()              -|
-	//
-	//       profile, err := parseIgnoreProfilesFromReader(pf) -|
-	//       profile.Filename = fileName                        | -> code block
-	//       return profile, err                               -|
-	//
-	// Question: how to ignore the whole go function?
-	IgnoreRegexp = regexp.MustCompile(`^\s*//\s*\+gocover:ignore:([0-9A-Za-z]+)`)
+	// This regexp matches the lines that
+	// starts with zero or more whitespace characters, then follows `//`, and zero or more  whitespace characters,
+	// then `+gocover:ignore:` and either `file` or `block`.
+	IgnoreRegexp = regexp.MustCompile(`^\s*//\s*\+gocover:ignore:(file|block)`)
 )
 
 // IgnoreType indicates the type of the ignore profile.
-// - ALL_IGNORE means the profile ignore the whole input file.
+// - FILE_IGNORE means the profile ignore the whole input file.
 // - BLOCK_IGNORE means the profile ignore several code block of the input file.
 type IgnoreType string
 
 const (
-	ALL_IGNORE   IgnoreType = "all"
+	FILE_IGNORE  IgnoreType = "file"
 	BLOCK_IGNORE IgnoreType = "block"
 )
 
@@ -79,23 +49,24 @@ type IgnoreBlock struct {
 	Lines      []int    // corresponding code line number of the ignore contents
 }
 
-// ParseIgnoreProfiles parses ignore profile data in the specified file and returns a ignore profile.
-func ParseIgnoreProfiles(fileName string) (*IgnoreProfile, error) {
+// ParseIgnoreProfiles parses ignore profile data in the specified file with the help of go unit test cover profile,
+// and returns a ignore profile. The ProfileBlock in the cover profile is already sorted.
+func ParseIgnoreProfiles(fileName string, coverProfile *cover.Profile) (*IgnoreProfile, error) {
 	pf, err := os.Open(fileName)
 	if err != nil {
 		return nil, err
 	}
 	defer pf.Close()
 
-	profile, err := parseIgnoreProfilesFromReader(pf)
+	profile, err := parseIgnoreProfilesFromReader(pf, coverProfile)
 	profile.Filename = fileName
 	return profile, err
 }
 
 // parseIgnoreProfilesFromReader parses ignore profile data from the Reader and returns a ignore profile.
-func parseIgnoreProfilesFromReader(rd io.Reader) (*IgnoreProfile, error) {
+func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*IgnoreProfile, error) {
 	s := bufio.NewScanner(rd)
-	lineNo := 0
+	lineNumber := 0
 
 	profile := &IgnoreProfile{
 		Lines: make(map[int]bool),
@@ -103,7 +74,7 @@ func parseIgnoreProfilesFromReader(rd io.Reader) (*IgnoreProfile, error) {
 	}
 
 	for s.Scan() {
-		lineNo++
+		lineNumber++
 		line := s.Text()
 		match := IgnoreRegexp.FindStringSubmatch(line)
 
@@ -111,89 +82,61 @@ func parseIgnoreProfilesFromReader(rd io.Reader) (*IgnoreProfile, error) {
 		if match == nil {
 			continue
 		}
-		if len(match) < 2 {
-			continue
-		}
 
 		// match contains the result of the regexp on IgnoreRegexp
-		// match = ["//+gocover:ignore:all", "all"] when input is `//+gocover:ignore:all`,
+		// match = ["//+gocover:ignore:file", "file"] when input is `//+gocover:ignore:file`,
 		// match = ["//+gocover:ignore:block", "block"] when input is `//+gocover:ignore:block`,
-		// match = ["//+gocover:ignore:10", "10"] when input is `//+gocover:ignore:10`,
 		ignoreKind := match[1]
-		if ignoreKind == "all" { // set type to ALL_IGNORE and skip further processing
-			profile.Type = ALL_IGNORE
+		if ignoreKind == "file" { // set type to FILE_IGNORE and skip further processing
+			profile.Type = FILE_IGNORE
 			break
 		} else if ignoreKind == "block" { // block
-			skipLineCnt := ignoreOnBlock(s, profile, lineNo, line)
-			lineNo += skipLineCnt
-		} else { // number
-			// parse number fail means it's not the supported pattern, continue next line
-			total, err := strconv.Atoi(ignoreKind)
-			if err != nil {
-				continue
-			}
-			skipLineCnt := ignoreOnNumber(s, profile, lineNo, total, line)
-			lineNo += skipLineCnt
+			ignoreBlockLineCnt := ignoreOnBlock(s, profile, coverProfile, lineNumber, line)
+			lineNumber += ignoreBlockLineCnt
+
+			//+gocover:ignore:block
+		} else {
+			// actually, here won't happen
 		}
 	}
 
 	return profile, nil
 }
 
-// ignoreOnBlock process pattern that ignore on code block.
-// proccessing until a blank line.
-func ignoreOnBlock(scanner *bufio.Scanner, profile *IgnoreProfile, startLine int, patternText string) int {
-	block := &IgnoreBlock{Annotation: patternText}
-	skipLines := 0
-	total := 0
-
-	var content string
-	for scanner.Scan() {
-		skipLines++
-		content = scanner.Text()
-		if strings.TrimSpace(content) == "" {
+func ignoreOnBlock(scanner *bufio.Scanner, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string) int {
+	var profileBlock *cover.ProfileBlock
+	startLine := patternLineNumber + 1
+	// `startLine` is the line number after the annotation line.
+	// Use the `startLine` to find the Profile Block.
+	// Because the two profile blocks may have the same value on startline and endline,
+	// which means that the finding process uses the condition the `startLine` equals to the start line of the block
+	// and less or equal to the end line of the block to find the suitable block.
+	for _, b := range coverProfile.Blocks {
+		if b.StartLine == startLine && startLine <= b.EndLine {
+			profileBlock = &b
 			break
 		}
-
-		startLine++
-		total++
-		block.Lines = append(block.Lines, startLine)
-		block.Contents = append(block.Contents, content)
-		profile.Lines[startLine] = true
 	}
 
-	if total != 0 {
-		profile.IgnoreBlocks = append(profile.IgnoreBlocks, block)
-	}
-	return skipLines
-}
-
-// ignoreOnNumber process pattern that ignore specific lines.
-func ignoreOnNumber(scanner *bufio.Scanner, profile *IgnoreProfile, startLine, cnt int, patternText string) int {
-	if cnt <= 0 {
+	if profileBlock == nil {
 		return 0
 	}
 
-	block := &IgnoreBlock{Annotation: patternText}
-	skipLines := 0
+	ignoreBlock := &IgnoreBlock{Annotation: patternText}
 
+	// Record the ignore code profile contents and its corresponding line number.
 	var content string
-	for cnt > 0 {
-		if !scanner.Scan() {
-			break
-		}
-		cnt--
-		startLine++
-		skipLines++
+	for i := profileBlock.StartLine; i <= profileBlock.EndLine; i++ {
+		// as the source file of the scanner is same with cover profile,
+		// so this method call always true.
+		scanner.Scan()
 		content = scanner.Text()
 
-		block.Lines = append(block.Lines, startLine)
-		block.Contents = append(block.Contents, content)
-		profile.Lines[startLine] = true
+		ignoreBlock.Lines = append(ignoreBlock.Lines, i)
+		ignoreBlock.Contents = append(ignoreBlock.Contents, content)
+		profile.Lines[i] = true
 	}
 
-	if skipLines != 0 {
-		profile.IgnoreBlocks = append(profile.IgnoreBlocks, block)
-	}
-	return skipLines
+	profile.IgnoreBlocks = append(profile.IgnoreBlocks, ignoreBlock)
+	return profileBlock.EndLine - profileBlock.StartLine + 1
 }

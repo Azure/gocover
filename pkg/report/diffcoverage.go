@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -34,23 +35,13 @@ func NewDiffCoverage(
 		excludesRegexps = append(excludesRegexps, reg)
 	}
 
-	ignoreProfiles := make(map[string]*annotation.IgnoreProfile)
-	for _, c := range changes {
-		ignoreProfile, err := annotation.ParseIgnoreProfiles(filepath.Join(repositoryPath, c.FileName))
-		if err == nil {
-			ignoreProfiles[c.FileName] = ignoreProfile
-		} else {
-			fmt.Printf("warn: %s\n", err)
-		}
-	}
-
 	return &diffCoverage{
 		comparedBranch:  comparedBranch,
 		profiles:        profiles,
 		changes:         changes,
 		excludesRegexps: excludesRegexps,
 		coverageTree:    NewCoverageTree(""),
-		ignoreProfiles:  ignoreProfiles,
+		repositoryPath:  repositoryPath,
 	}, nil
 
 }
@@ -64,13 +55,16 @@ type diffCoverage struct {
 	profiles        []*cover.Profile  // go unit test coverage profiles
 	changes         []*gittool.Change // diff change between compared branch and HEAD commit
 	excludesRegexps []*regexp.Regexp  // excludes files regexp patterns
+	repositoryPath  string
 	ignoreProfiles  map[string]*annotation.IgnoreProfile
+	coverProfiles   map[string]*cover.Profile
 	coverageTree    CoverageTree
 }
 
 func (diff *diffCoverage) GenerateDiffCoverage() (*Statistics, error) {
 	diff.ignore()
 	diff.filter()
+	diff.generateIgnoreProfile()
 	return diff.percentCovered(), nil
 }
 
@@ -108,6 +102,47 @@ func (diff *diffCoverage) filter() {
 	diff.profiles = filterProfiles
 }
 
+func (diff *diffCoverage) generateIgnoreProfile() {
+	ignoreProfiles := make(map[string]*annotation.IgnoreProfile)
+	coverProfiles := make(map[string]*cover.Profile)
+
+	for _, c := range diff.changes {
+		p := findCoverProfile(c, diff.profiles)
+		if p == nil {
+			continue
+		}
+
+		sort.Sort(blocksByStart(p.Blocks))
+		coverProfiles[c.FileName] = p
+
+		ignoreProfile, err := annotation.ParseIgnoreProfiles(filepath.Join(diff.repositoryPath, c.FileName), p)
+		if err == nil {
+			ignoreProfiles[c.FileName] = ignoreProfile
+			for _, b := range ignoreProfile.IgnoreBlocks {
+				fmt.Fprintln(os.Stdout, b.Annotation)
+				for i := 0; i < len(b.Contents); i++ {
+					fmt.Fprintf(os.Stdout, "%d %s\n", b.Lines[i], b.Contents[i])
+				}
+			}
+		} else {
+			fmt.Println(err)
+		}
+	}
+
+	diff.ignoreProfiles = ignoreProfiles
+	diff.coverProfiles = coverProfiles
+}
+
+// findCoverProfile find the expected cover profile by file name.
+func findCoverProfile(change *gittool.Change, profiles []*cover.Profile) *cover.Profile {
+	for _, profile := range profiles {
+		if isSubFolderTo(profile.FileName, change.FileName) {
+			return profile
+		}
+	}
+	return nil
+}
+
 // percentCovered generate diff coverage profile
 // using go unit test covreage profile and diff changes between two commits.
 func (diff *diffCoverage) percentCovered() *Statistics {
@@ -121,14 +156,14 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 		}
 
 		ignoreProfile, ok := diff.ignoreProfiles[change.FileName]
-		if ok && ignoreProfile.Type == annotation.ALL_IGNORE {
+		if ok && ignoreProfile.Type == annotation.FILE_IGNORE {
 			continue
 		}
 
 		switch change.Mode {
 		case gittool.NewMode:
 
-			if coverageProfile := generateCoverageProfileWithNewMode(p, change); coverageProfile != nil {
+			if coverageProfile := generateCoverageProfileWithNewMode(p, change, ignoreProfile); coverageProfile != nil {
 				coverageProfiles = append(coverageProfiles, coverageProfile)
 
 				node := diff.coverageTree.FindOrCreate(change.FileName)
@@ -140,7 +175,7 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 		case gittool.ModifyMode:
 
-			if coverageProfile := generateCoverageProfileWithModifyMode(p, change); coverageProfile != nil {
+			if coverageProfile := generateCoverageProfileWithModifyMode(p, change, ignoreProfile); coverageProfile != nil {
 				coverageProfiles = append(coverageProfiles, coverageProfile)
 
 				node := diff.coverageTree.FindOrCreate(change.FileName)
@@ -169,21 +204,28 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 }
 
 // generateCoverageProfileWithNewMode generates for new file
-func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change) *CoverageProfile {
+func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change, ignoreProfile *annotation.IgnoreProfile) *CoverageProfile {
 	var total, covered int64
 
 	sort.Sort(blocksByStart(profile.Blocks))
 
 	violationsMap := make(map[int]bool)
 	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
-	// which means that the value of NumStmt is less or equal tothe total numbers of the code block.
+	// which means that the value of NumStmt is less or equal to the total numbers of the code block.
 	for _, b := range profile.Blocks {
-		total += int64(b.NumStmt)
-		if b.Count > 0 {
-			covered += int64(b.NumStmt)
-		} else {
-			for i := b.StartLine; i <= b.EndLine; i++ {
-				violationsMap[i] = true
+
+		for lineNo := b.StartLine; lineNo <= b.EndLine; lineNo++ {
+			if ignoreProfile != nil {
+				if _, ok := ignoreProfile.Lines[lineNo]; ok {
+					continue
+				}
+			}
+
+			total++
+			if b.Count > 0 {
+				covered++
+			} else {
+				violationsMap[lineNo] = true
 			}
 		}
 	}
@@ -214,7 +256,7 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 }
 
 // generateCoverageProfileWithModifyMode generates for modify file
-func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gittool.Change) *CoverageProfile {
+func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gittool.Change, ignoreProfile *annotation.IgnoreProfile) *CoverageProfile {
 
 	sort.Sort(blocksByStart(profile.Blocks))
 
@@ -227,6 +269,13 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 
 		var violationLines []int
 		for lineNo := section.StartLine; lineNo <= section.EndLine; lineNo++ {
+
+			// this line is ignored in annotation
+			if ignoreProfile != nil {
+				if _, ok := ignoreProfile.Lines[lineNo]; ok {
+					continue
+				}
+			}
 
 			block := findProfileBlock(profile.Blocks, lineNo)
 			if block == nil {
