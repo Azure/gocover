@@ -1,18 +1,21 @@
 package report
 
 import (
+	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/gittool"
 	"golang.org/x/tools/cover"
 )
 
 func TestDiffCoverage(t *testing.T) {
 	t.Run("NewDiffCoverage", func(t *testing.T) {
-		_, err := NewDiffCoverage([]*cover.Profile{}, []*gittool.Change{}, []string{"**"}, "testbranch")
+		_, err := NewDiffCoverage([]*cover.Profile{}, []*gittool.Change{}, []string{"**"}, "testbranch", "")
 		if err == nil {
 			t.Error("should return error")
 		}
@@ -24,7 +27,7 @@ func TestDiffCoverage(t *testing.T) {
 				".*github.com/Azure/gocover/report/tool.go",
 				"github.com/Azure/gocover/test/.*",
 				"github.com/Azure/gocover/mock_*",
-			}, "testbranch")
+			}, "testbranch", "")
 		if err != nil {
 			t.Errorf("should not return error: %s", err)
 		}
@@ -346,6 +349,17 @@ func TestDiffCoverage(t *testing.T) {
 						},
 					},
 				},
+				{
+					FileName: "github.com/Azure/gocover/report/ignore.go",
+					Blocks: []cover.ProfileBlock{
+						{
+							StartLine: 1,
+							EndLine:   3,
+							NumStmt:   3,
+							Count:     1,
+						},
+					},
+				},
 			},
 			changes: []*gittool.Change{
 				{
@@ -414,6 +428,22 @@ func TestDiffCoverage(t *testing.T) {
 						},
 					},
 				},
+				{
+					FileName: "report/ignore.go",
+					Mode:     gittool.DeleteMode,
+					Sections: []*gittool.Section{
+						{
+							Operation: gittool.Add,
+							Count:     3,
+							StartLine: 4,
+							EndLine:   6,
+							Contents:  []string{"line4", "line5", "line6"},
+						},
+					},
+				},
+			},
+			ignoreProfiles: map[string]*annotation.IgnoreProfile{
+				"report/ignore.go": {Type: annotation.FILE_IGNORE},
 			},
 		}
 
@@ -437,6 +467,36 @@ func TestDiffCoverage(t *testing.T) {
 				t.Errorf("should have 2 coverage profile, but get: %d", len(statistics.CoverageProfile))
 			}
 		}
+	})
+
+	t.Run("generateIgnoreProfile", func(t *testing.T) {
+		tempDir := t.TempDir()
+		_ = ioutil.WriteFile(filepath.Join(tempDir, "foo.go"), []byte(`
+		//+gocover:ignore:block
+		if err != nil {
+			return err
+		}`), 0644)
+
+		diff := &diffCoverage{
+			repositoryPath: tempDir,
+			changes: []*gittool.Change{
+				{FileName: "foo.go"},
+				{FileName: "bar.go"},
+			},
+			profiles: []*cover.Profile{
+				{
+					FileName: "github.com/Azure/gocover/foo.go",
+					Blocks: []cover.ProfileBlock{
+						{
+							StartLine: 3,
+							EndLine:   5,
+						},
+					},
+				},
+			},
+		}
+
+		diff.generateIgnoreProfile()
 	})
 }
 
@@ -484,10 +544,20 @@ func TestGenerateCoverageProfileWithModifyMode(t *testing.T) {
 					EndLine:   9,
 					Contents:  []string{"line7", "line8", "line9"},
 				},
+				{
+					Operation: gittool.Add,
+					Count:     3,
+					StartLine: 10,
+					EndLine:   12,
+					Contents:  []string{"line10", "line11", "line12"},
+				},
 			},
 		}
 
-		coverageProfile := generateCoverageProfileWithModifyMode(profile, change)
+		coverageProfile := generateCoverageProfileWithModifyMode(profile, change, &annotation.IgnoreProfile{
+			Type:  annotation.BLOCK_IGNORE,
+			Lines: map[int]bool{10: true, 11: true, 12: true},
+		})
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
 		}
@@ -530,7 +600,7 @@ func TestGenerateCoverageProfileWithModifyMode(t *testing.T) {
 			Sections: []*gittool.Section{},
 		}
 
-		coverageProfile := generateCoverageProfileWithModifyMode(profile, change)
+		coverageProfile := generateCoverageProfileWithModifyMode(profile, change, nil)
 		if coverageProfile != nil {
 			t.Error("should return nil when no lines in the profile")
 		}
@@ -554,6 +624,12 @@ func TestGenerateCoverageProfileWithNewMode(t *testing.T) {
 					NumStmt:   3,
 					Count:     0,
 				},
+				{
+					StartLine: 7,
+					EndLine:   10,
+					NumStmt:   3,
+					Count:     0,
+				},
 			},
 		}
 		change := &gittool.Change{
@@ -570,7 +646,10 @@ func TestGenerateCoverageProfileWithNewMode(t *testing.T) {
 			},
 		}
 
-		coverageProfile := generateCoverageProfileWithNewMode(profile, change)
+		coverageProfile := generateCoverageProfileWithNewMode(profile, change, &annotation.IgnoreProfile{
+			Type:  annotation.BLOCK_IGNORE,
+			Lines: map[int]bool{7: true, 8: true, 9: true, 10: true},
+		})
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
 		}
@@ -613,9 +692,45 @@ func TestGenerateCoverageProfileWithNewMode(t *testing.T) {
 			Sections: []*gittool.Section{},
 		}
 
-		coverageProfile := generateCoverageProfileWithNewMode(profile, change)
+		coverageProfile := generateCoverageProfileWithNewMode(profile, change, nil)
 		if coverageProfile != nil {
 			t.Error("should return nil when no lines in the profile")
+		}
+	})
+}
+
+func TestFindCoverProfile(t *testing.T) {
+	t.Run("find cover profile", func(t *testing.T) {
+		profiles := []*cover.Profile{
+			{
+				FileName: "github.com/Azure/gocover/report/tool.go",
+			},
+		}
+		change := &gittool.Change{
+			FileName: "report/tool.go",
+			Mode:     gittool.NewMode,
+		}
+
+		profile := findCoverProfile(change, profiles)
+		if profile == nil {
+			t.Errorf("profile should not be nil")
+		}
+	})
+
+	t.Run("cannot find cover profile", func(t *testing.T) {
+		profiles := []*cover.Profile{
+			{
+				FileName: "github.com/Azure/gocover/report/tool.go",
+			},
+		}
+		change := &gittool.Change{
+			FileName: "report/foo.go",
+			Mode:     gittool.NewMode,
+		}
+
+		profile := findCoverProfile(change, profiles)
+		if profile != nil {
+			t.Errorf("profile should be nil")
 		}
 	})
 }

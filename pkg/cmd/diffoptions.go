@@ -54,7 +54,7 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git diff: %w", err)
 	}
 
-	diffCoverage, err := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch)
+	diffCoverage, err := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch, o.RepositoryPath)
 	if err != nil {
 		return fmt.Errorf("new diff converage: %w", err)
 	}
