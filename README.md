@@ -2,7 +2,7 @@
 
 ## Overview
 
-`gocover` is a go unit test coverage explorer and inspector, providing go module level test coverage based on `go test` coverage result, as well as diff coverage between git commits. Plus, the tool supports annotations of ignoring file/[blocks]() at coverage calculation stage.
+`gocover` is a go unit test coverage explorer and inspector, providing go module level test coverage based on `go test` coverage result, as well as diff coverage between git commits. Plus, the tool supports annotations of ignoring file/[blocks](https://go.dev/blog/cover) at coverage calculation stage.
 
 ![project overview](./docs/images/overview.svg)
 
@@ -50,7 +50,7 @@ func foo() {}
 
 We follow the definition of [basic block](https://go.dev/blog/cover) from `go test` to keep the same logic on coverage calculation.
 
-Note that it is different from the [golang block](https://go.dev/ref/spec#Blocks). If you are not sure about the definition of the block, you can check the detail about every `block` within your change at the `coverage.out` file. Make sure to put the annotation into the `block`. 
+Note that it is different from the [golang block](https://go.dev/ref/spec#Blocks). If you are not sure about the definition of the block, you can check the detail about every `block` within your change at the `coverage.out` file. Make sure to put the annotation into the `block`.
 
 ```go
 package main
@@ -65,7 +65,7 @@ func case1() { //+gocover:ignore:block              -|
 }
 
 func case2(x int) {//+gocover:ignore:block          -|
-	var c, python, java = true, false, "no!"      // | -> Block ignored (block ends before the brace in line 71)
+	var c, python, java = true, false, "no!"      // | -> Block ignored
 	if x > 0 {                                    //-|
 		fmt.Println(i, j, c, python, java)
 	}
@@ -73,10 +73,10 @@ func case2(x int) {//+gocover:ignore:block          -|
 	fmt.Println(i, j, c, python, java, x)
 }
 
-func case2(x int) {//+gocover:ignore:block          -|
-	var c, python, java = true, false, "no!"      // | -> Block1 ingored (block ends before the brace in line 80)
+func case3(x int) {//+gocover:ignore:block          -|
+	var c, python, java = true, false, "no!"      // | -> Block1 ingored
 	if x > 0 { //+gocover:ignore:block              -|
-		fmt.Println(i, j, c, python, java)        // | -> Block2 ingored (block starts from the brace in line 80 and ends before the brace in line 82)
+		fmt.Println(i, j, c, python, java)        // | -> Block2 ingored
 	}                                             //-|
 
 	fmt.Println(i, j, c, python, java, x)
@@ -87,11 +87,11 @@ func case2(x int) {//+gocover:ignore:block          -|
 
 Here is how we inspect the coverage:
 
-- *Total Lines:* # of total lines of your change or the entire repo/module.
-- *Ignored Lines:* # of the lines you ignored.
-- *Effictive Lines:* total lines - ignored lines
-- *Covered Lines:* # of the lines covered by test
-- *Coverage:* Covered Lines / Effictive Lines
+- **Total Lines:** # of total lines of your change or the entire repo/module.
+- **Ignored Lines:** # of the lines you ignored.
+- **Effictive Lines:** total lines - ignored lines
+- **Covered Lines:** # of the lines covered by test
+- **Coverage:** Covered Lines / Effictive Lines
 
 ## Contributing
 
