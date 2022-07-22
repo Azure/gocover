@@ -59,27 +59,27 @@ import "fmt"
 
 var i, j int = 1, 2
 
-func case1() { //+gocover:ignore:block              -|
-	var c, python, java = true, false, "no!"      // | -> Block ignored
-	fmt.Println(i, j, c, python, java)            //-|
+func case1() { //+gocover:ignore:block           -|
+ var c, python, java = true, false, "no!"      // | -> Block ignored
+ fmt.Println(i, j, c, python, java)            //-|
 }
 
-func case2(x int) {//+gocover:ignore:block          -|
-	var c, python, java = true, false, "no!"      // | -> Block ignored
-	if x > 0 {                                    //-|
-		fmt.Println(i, j, c, python, java)
-	}
+func case2(x int) {//+gocover:ignore:block       -|
+ var c, python, java = true, false, "no!"      // | -> Block ignored
+ if x > 0 {                                    //-|
+  fmt.Println(i, j, c, python, java)
+ }
 
-	fmt.Println(i, j, c, python, java, x)
+ fmt.Println(i, j, c, python, java, x)
 }
 
-func case3(x int) {//+gocover:ignore:block          -|
-	var c, python, java = true, false, "no!"      // | -> Block1 ingored
-	if x > 0 { //+gocover:ignore:block              -|
-		fmt.Println(i, j, c, python, java)        // | -> Block2 ingored
-	}                                             //-|
+func case3(x int) {//+gocover:ignore:block       -|
+ var c, python, java = true, false, "no!"      // | -> Block1 ingored
+ if x > 0 { //+gocover:ignore:block              -|
+  fmt.Println(i, j, c, python, java)           // | -> Block2 ingored
+ }                                             //-|
 
-	fmt.Println(i, j, c, python, java, x)
+ fmt.Println(i, j, c, python, java, x)
 }
 ```
 
