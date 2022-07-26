@@ -17,8 +17,8 @@ Use this tool to generate diff coverage for go code between two branch.
 In this way to make sure that new changes has a expected test coverage, and won't affect old codes.
 `
 
-	getExample = `# Generate diff coverage report in HTML format, and failure rate should be less than 20%
-gocover --cover-profile=coverage.out --compare-branch=origin/master --format html --failure-rate 20.0 --output coverage.html
+	getExample = `# Generate diff coverage report in HTML format, and coverage baseline should be greater than 80%
+gocover --cover-profile=coverage.out --compare-branch=origin/master --format html --coverage-baseline 80.0 --output coverage.html
 `
 )
 
@@ -46,7 +46,7 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
 	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
 	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
-	cmd.Flags().Float64Var(&o.FailureRate, "failure-rate", o.FailureRate, "returns an error code if coverage or quality score is above failure rate")
+	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
 
