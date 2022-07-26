@@ -89,12 +89,19 @@ func newFullCoverageCommand() *cobra.Command {
 			}
 
 			all := fullCoverage.BuildFullCoverageTree()
+			var coverage float64
 			for _, info := range all {
+				if info.TotalLines == 0 {
+					coverage = 100.0
+				} else {
+					coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+				}
+
 				fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %.1f%%\n",
 					info.Path,
 					info.TotalCoveredLines,
 					info.TotalLines,
-					float64(info.TotalCoveredLines)/float64(info.TotalLines)*100,
+					coverage,
 				)
 			}
 
@@ -106,13 +113,19 @@ func newFullCoverageCommand() *cobra.Command {
 
 				now := time.Now().UTC()
 				for _, info := range all {
+					if info.TotalLines == 0 {
+						coverage = 100.0
+					} else {
+						coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+					}
+
 					err = dbClient.Store(context.Background(), &dbclient.Data{
 						PreciseTimestamp: now,
 						LinesCovered:     info.TotalCoveredLines,
 						LinesValid:       info.TotalLines,
 						ModulePath:       moduleHostPath,
 						FilePath:         info.Path,
-						Coverage:         float64(info.TotalCoveredLines) / float64(info.TotalLines),
+						Coverage:         coverage,
 					})
 					if err != nil {
 						return fmt.Errorf("store data: %w", err)
