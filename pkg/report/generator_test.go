@@ -254,6 +254,7 @@ func TestPercentCovered(t *testing.T) {
 			{expected: 100.0, total: 10, covered: 10},
 			{expected: 50.0, total: 10, covered: 5},
 			{expected: 0.0, total: 10, covered: 0},
+			{expected: 100.0, total: 0, covered: 0},
 		}
 
 		for _, testcase := range testsuites {
