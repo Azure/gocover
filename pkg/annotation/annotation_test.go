@@ -18,14 +18,15 @@ func TestIgnoreRegexp(t *testing.T) {
 			expect []string
 		}{
 			{input: "//+gocover:ignore:file", expect: []string{"//+gocover:ignore:file", "file"}},
-			{input: "// +gocover:ignore:file", expect: []string{"// +gocover:ignore:file", "file"}},
 			{input: "    //+gocover:ignore:file", expect: []string{"    //+gocover:ignore:file", "file"}},
 			{input: "	//+gocover:ignore:file", expect: []string{"	//+gocover:ignore:file", "file"}},
 			{input: "//+gocover:ignore:block", expect: []string{"//+gocover:ignore:block", "block"}},
-			{input: "// +gocover:ignore:block", expect: []string{"// +gocover:ignore:block", "block"}},
 			{input: "    //+gocover:ignore:block", expect: []string{"    //+gocover:ignore:block", "block"}},
 			{input: "	//+gocover:ignore:block", expect: []string{"	//+gocover:ignore:block", "block"}},
-			{input: "  //  //+gocover:ignore:block", expect: nil},
+			{input: "  {  //+gocover:ignore:block", expect: []string{"  {  //+gocover:ignore:block", "block"}},
+			{input: "  //  //+gocover:ignore:block", expect: []string{"  //  //+gocover:ignore:block", "block"}},
+			{input: "// +gocover:ignore:block", expect: nil},
+			{input: "// +gocover:ignore:file", expect: nil},
 			{input: "//+gocover:ignore:abc", expect: nil},
 			{input: "//+gocover:ignore:123", expect: nil},
 			{input: "//+gocover:ignore:", expect: nil},
