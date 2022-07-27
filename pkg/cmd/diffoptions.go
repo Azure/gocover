@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/Azure/gocover/pkg/report"
@@ -25,6 +26,8 @@ type DiffOptions struct {
 	Output           string
 	Excludes         []string
 	Style            string
+
+	Writer io.Writer
 }
 
 // NewDiffOptions returns a Options with default values.

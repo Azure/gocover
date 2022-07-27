@@ -443,7 +443,7 @@ func TestDiffCoverage(t *testing.T) {
 				},
 			},
 			ignoreProfiles: map[string]*annotation.IgnoreProfile{
-				"report/ignore.go": {Type: annotation.FILE_IGNORE},
+				"report/ignore.go": {Type: annotation.FILE_IGNORE, IgnoreBlocks: make(map[cover.ProfileBlock]*annotation.IgnoreBlock)},
 			},
 		}
 
@@ -472,8 +472,8 @@ func TestDiffCoverage(t *testing.T) {
 	t.Run("generateIgnoreProfile", func(t *testing.T) {
 		tempDir := t.TempDir()
 		_ = ioutil.WriteFile(filepath.Join(tempDir, "foo.go"), []byte(`
-		//+gocover:ignore:block
 		if err != nil {
+			//+gocover:ignore:block
 			return err
 		}`), 0644)
 
@@ -555,8 +555,8 @@ func TestGenerateCoverageProfileWithModifyMode(t *testing.T) {
 		}
 
 		coverageProfile := generateCoverageProfileWithModifyMode(profile, change, &annotation.IgnoreProfile{
-			Type:  annotation.BLOCK_IGNORE,
-			Lines: map[int]bool{10: true, 11: true, 12: true},
+			Type:         annotation.BLOCK_IGNORE,
+			IgnoreBlocks: make(map[cover.ProfileBlock]*annotation.IgnoreBlock),
 		})
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
@@ -647,8 +647,10 @@ func TestGenerateCoverageProfileWithNewMode(t *testing.T) {
 		}
 
 		coverageProfile := generateCoverageProfileWithNewMode(profile, change, &annotation.IgnoreProfile{
-			Type:  annotation.BLOCK_IGNORE,
-			Lines: map[int]bool{7: true, 8: true, 9: true, 10: true},
+			Type: annotation.BLOCK_IGNORE,
+			IgnoreBlocks: map[cover.ProfileBlock]*annotation.IgnoreBlock{
+				cover.ProfileBlock{StartLine: 7, EndLine: 10, NumStmt: 3, Count: 0}: &annotation.IgnoreBlock{Contents: []string{"line7", "line8", "line9", "line10"}, Lines: []int{7, 8, 9, 10}},
+			},
 		})
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
@@ -813,35 +815,56 @@ func TestIsSubFolderTo(t *testing.T) {
 	})
 }
 
+// 1  package foo
+// 2
+// 3  import "fmt"
+// 4
+// 5 func plus(a, b int) int {
+// 6 	fmt.Println("plus")
+// 7
+// 8 	if a > b {
+// 9 		fmt.Println(a + b)
+// 10 		return a + b
+// 11}
+// 12
+// 13 	fmt.Println(b + a)
+// 14 	return b + a
+// 15}
+//
+// Above code would generate the cover profile following:
+// github.com/Azure/gocover/pkg/annotation/foo.go:5.25,8.11 2 0
+// github.com/Azure/gocover/pkg/annotation/foo.go:8.11,11.3 2 0
+// github.com/Azure/gocover/pkg/annotation/foo.go:13.2,14.14 2 0
 func TestFindProfileBlock(t *testing.T) {
-	t.Run("findProfileBlock", func(t *testing.T) {
-		block0 := cover.ProfileBlock{StartLine: 1, EndLine: 3}
-		block1 := cover.ProfileBlock{StartLine: 3, EndLine: 5}
-		block2 := cover.ProfileBlock{StartLine: 7, EndLine: 7}
-		block3 := cover.ProfileBlock{StartLine: 8, EndLine: 10}
 
-		blocks := []cover.ProfileBlock{block0, block1, block2, block3}
+	t.Run("findProfileBlock", func(t *testing.T) {
+		block0 := cover.ProfileBlock{StartLine: 5, StartCol: 25, EndLine: 8, EndCol: 11}
+		block1 := cover.ProfileBlock{StartLine: 8, StartCol: 11, EndLine: 11, EndCol: 3}
+		block2 := cover.ProfileBlock{StartLine: 13, StartCol: 2, EndLine: 14, EndCol: 14}
+
+		blocks := []cover.ProfileBlock{block0, block1, block2}
 
 		testsuites := []struct {
-			input  int
-			expect *cover.ProfileBlock
+			lineNumber int
+			line       string
+			expect     *cover.ProfileBlock
 		}{
-			{input: 0, expect: nil},
-			{input: 1, expect: &blocks[0]},
-			{input: 2, expect: &blocks[0]},
-			{input: 3, expect: &blocks[1]},
-			{input: 4, expect: &blocks[1]},
-			{input: 5, expect: &blocks[1]},
-			{input: 6, expect: nil},
-			{input: 7, expect: &blocks[2]},
-			{input: 8, expect: &blocks[3]},
-			{input: 9, expect: &blocks[3]},
-			{input: 10, expect: &blocks[3]},
-			{input: 11, expect: nil},
+			{lineNumber: 4, line: ``, expect: nil},
+			{lineNumber: 5, line: `func plus(a, b int) int {`, expect: nil},
+			{lineNumber: 6, line: `	fmt.Println("plus")`, expect: &blocks[0]},
+			{lineNumber: 7, line: ``, expect: &blocks[0]},
+			{lineNumber: 8, line: `	if a > b {`, expect: &blocks[0]},
+			{lineNumber: 9, line: `		fmt.Println(a + b)`, expect: &blocks[1]},
+			{lineNumber: 10, line: `		return a + b`, expect: &blocks[1]},
+			{lineNumber: 11, line: `	}`, expect: &blocks[1]},
+			{lineNumber: 12, line: ``, expect: nil},
+			{lineNumber: 13, line: `	fmt.Println(b + a)`, expect: &blocks[2]},
+			{lineNumber: 14, line: `	return b + a`, expect: &blocks[2]},
+			{lineNumber: 15, line: `}`, expect: nil},
 		}
 
 		for _, testcase := range testsuites {
-			actual := findProfileBlock(blocks, testcase.input)
+			actual := findProfileBlock(blocks, testcase.lineNumber, testcase.line)
 			if actual != testcase.expect {
 				t.Errorf("expect %v, but get %v", testcase.expect, actual)
 			}

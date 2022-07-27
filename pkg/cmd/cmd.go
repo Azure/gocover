@@ -37,6 +37,7 @@ func NewGoCoverCommand() *cobra.Command {
 		Example:      getExample,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			o.Writer = cmd.OutOrStdout()
 			if err := o.Run(cmd, args); err != nil {
 				return fmt.Errorf("generate diff coverage %w", err)
 			}
