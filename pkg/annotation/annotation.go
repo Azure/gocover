@@ -33,11 +33,10 @@ const (
 // IgnoreProfile represents the ignore profiling data for a specific file.
 type IgnoreProfile struct {
 	// type of the ignore profile.
-	// when it's BLOCK_IGNORE, Lines includes all the code line number that should be ignored,
-	// IgnoreBlocks contains the concrete ignore data.
+	// when it's BLOCK_IGNORE, IgnoreBlocks contains the concrete ignore data.
 	Type         IgnoreType
 	Filename     string
-	IgnoreBlocks map[*cover.ProfileBlock]*IgnoreBlock
+	IgnoreBlocks map[cover.ProfileBlock]*IgnoreBlock
 }
 
 // IgnoreBlock represents a single block of ignore profiling data.
@@ -72,7 +71,7 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 
 	profile := &IgnoreProfile{
 		Type:         BLOCK_IGNORE,
-		IgnoreBlocks: make(map[*cover.ProfileBlock]*IgnoreBlock),
+		IgnoreBlocks: make(map[cover.ProfileBlock]*IgnoreBlock),
 	}
 
 	totalLines := len(fileLines)
@@ -96,6 +95,7 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 			// as index of fileLines starts from 0, the endline is actually the next index that waiting handling.
 			i = ignoreOnBlock(fileLines, profile, coverProfile, i+1, fileLines[i])
 		} else {
+			//+gocover:ignore:block
 			i++
 		}
 	}
@@ -103,11 +103,13 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 	return profile, nil
 }
 
+// ignoreOnBlock finds the cover profile block that contains the ignore pattern text
+// and returns the line number of the end line of cover profile block
 func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string) int {
 	var profileBlock *cover.ProfileBlock
 
 	// gocover ignore patterns are placed in block like following,
-	// so the line number of it >= start line of code block and less than end line of code block
+	// so the line number of it >= start line of code block and <= end line of code block
 	// {  //+gocover:ignore:xxx
 	//    //+gocover:ignore:xxx
 	// }
@@ -119,7 +121,7 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 	}
 
 	if profileBlock == nil {
-		return 0
+		return patternLineNumber + 1
 	}
 
 	ignoreBlock := &IgnoreBlock{Annotation: patternText}
@@ -132,8 +134,8 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 		ignoreBlock.Contents = append(ignoreBlock.Contents, fileLines[i-1])
 	}
 
-	if _, ok := profile.IgnoreBlocks[profileBlock]; !ok {
-		profile.IgnoreBlocks[profileBlock] = ignoreBlock
+	if _, ok := profile.IgnoreBlocks[*profileBlock]; !ok {
+		profile.IgnoreBlocks[*profileBlock] = ignoreBlock
 	}
 
 	return profileBlock.EndLine

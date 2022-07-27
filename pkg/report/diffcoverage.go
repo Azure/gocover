@@ -119,7 +119,6 @@ func (diff *diffCoverage) generateIgnoreProfile() {
 		if err == nil {
 			ignoreProfiles[c.FileName] = ignoreProfile
 			for _, b := range ignoreProfile.IgnoreBlocks {
-				fmt.Fprintln(os.Stdout, b.Annotation)
 				for i := 0; i < len(b.Contents); i++ {
 					fmt.Fprintf(os.Stdout, "%d %s\n", b.Lines[i], b.Contents[i])
 				}
@@ -205,23 +204,22 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 // generateCoverageProfileWithNewMode generates for new file
 func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change, ignoreProfile *annotation.IgnoreProfile) *CoverageProfile {
-	var total, covered, ignored int64
+	var total, covered int64
+
+	sort.Sort(blocksByStart(profile.Blocks))
 
 	violationsMap := make(map[int]bool)
 	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
 	// which means that the value of NumStmt is less or equal to the total numbers of the code block.
 	for _, b := range profile.Blocks {
 
-		if ignoreProfile.IgnoreBlocks != nil {
-			if _, ok := ignoreProfile.IgnoreBlocks[&b]; ok {
-				total += int64(b.NumStmt)
-				ignored += int64(b.NumStmt)
+		if ignoreProfile != nil {
+			if _, ok := ignoreProfile.IgnoreBlocks[b]; ok {
 				continue
 			}
 		}
 
 		total += int64(b.NumStmt)
-		// effective += int64(b.NumStmt)
 		if b.Count > 0 {
 			covered += int64(b.NumStmt)
 		} else {
@@ -271,15 +269,15 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 	for _, section := range change.Sections {
 
 		var violationLines []int
-		for lineNo := section.StartLine; lineNo <= section.EndLine; lineNo++ {
+		for lineNum := section.StartLine; lineNum <= section.EndLine; lineNum++ {
 
-			block := findProfileBlock(profile.Blocks, lineNo)
+			block := findProfileBlock(profile.Blocks, lineNum, section.Contents[lineNum-section.StartLine])
 			if block == nil {
 				continue
 			}
 
 			if ignoreProfile != nil {
-				if _, ok := ignoreProfile.IgnoreBlocks[block]; ok {
+				if _, ok := ignoreProfile.IgnoreBlocks[*block]; ok {
 					continue
 				}
 			}
@@ -289,7 +287,7 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 			if block.Count > 0 {
 				covered++
 			} else {
-				violationLines = append(violationLines, lineNo)
+				violationLines = append(violationLines, lineNum)
 			}
 
 		}
@@ -323,23 +321,31 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 // findProfileBlock find the expected profile block by line number.
 // as a profile block has start line and end line, we use binary search to search for it using start line first,
 // then validate the end line.
-func findProfileBlock(blocks []cover.ProfileBlock, lineNo int) *cover.ProfileBlock {
+func findProfileBlock(blocks []cover.ProfileBlock, lineNumber int, line string) *cover.ProfileBlock {
 	idx := sort.Search(len(blocks), func(i int) bool {
-		return blocks[i].StartLine >= lineNo
+		return blocks[i].StartLine >= lineNumber
 	})
 
-	// no suitable block, index is out of range
+	// index is out of range, check the last one
 	if idx == len(blocks) {
 		idx--
-		if blocks[idx].StartLine <= lineNo && blocks[idx].EndLine >= lineNo {
+		if blocks[idx].StartLine <= lineNumber && lineNumber <= blocks[idx].EndLine {
+			if blocks[idx].StartLine == lineNumber && len(line) <= blocks[idx].StartCol {
+				return nil
+			}
 			return &blocks[idx]
 		} else {
 			return nil
 		}
 	}
 
+	// find a suitable one, but need to check in reverse order
 	for idx >= 0 {
-		if blocks[idx].StartLine <= lineNo && blocks[idx].EndLine >= lineNo {
+		if blocks[idx].StartLine <= lineNumber && lineNumber <= blocks[idx].EndLine {
+			if blocks[idx].StartLine == lineNumber && len(line) <= blocks[idx].StartCol {
+				idx--
+				continue
+			}
 			return &blocks[idx]
 		}
 		idx--
