@@ -205,28 +205,31 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 // generateCoverageProfileWithNewMode generates for new file
 func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change, ignoreProfile *annotation.IgnoreProfile) *CoverageProfile {
-	var total, covered int64
-
-	sort.Sort(blocksByStart(profile.Blocks))
+	var total, covered, ignored int64
 
 	violationsMap := make(map[int]bool)
 	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
 	// which means that the value of NumStmt is less or equal to the total numbers of the code block.
 	for _, b := range profile.Blocks {
 
-		for lineNo := b.StartLine; lineNo <= b.EndLine; lineNo++ {
-			if ignoreProfile != nil {
-				if _, ok := ignoreProfile.Lines[lineNo]; ok {
-					continue
-				}
+		if ignoreProfile.IgnoreBlocks != nil {
+			if _, ok := ignoreProfile.IgnoreBlocks[&b]; ok {
+				total += int64(b.NumStmt)
+				ignored += int64(b.NumStmt)
+				continue
+			}
+		}
+
+		total += int64(b.NumStmt)
+		// effective += int64(b.NumStmt)
+		if b.Count > 0 {
+			covered += int64(b.NumStmt)
+		} else {
+
+			for lineNum := b.StartLine; lineNum <= b.EndLine; lineNum++ {
+				violationsMap[lineNum] = true
 			}
 
-			total++
-			if b.Count > 0 {
-				covered++
-			} else {
-				violationsMap[lineNo] = true
-			}
 		}
 	}
 
@@ -270,16 +273,15 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 		var violationLines []int
 		for lineNo := section.StartLine; lineNo <= section.EndLine; lineNo++ {
 
-			// this line is ignored in annotation
-			if ignoreProfile != nil {
-				if _, ok := ignoreProfile.Lines[lineNo]; ok {
-					continue
-				}
-			}
-
 			block := findProfileBlock(profile.Blocks, lineNo)
 			if block == nil {
 				continue
+			}
+
+			if ignoreProfile != nil {
+				if _, ok := ignoreProfile.IgnoreBlocks[block]; ok {
+					continue
+				}
 			}
 
 			// check line?
