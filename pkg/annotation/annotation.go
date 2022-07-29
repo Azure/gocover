@@ -12,13 +12,12 @@ import (
 var (
 	// IgnoreRegexp the regexp for the gocover ignore pattern.
 	// Two kinds of ignore pattern are supported:
-	// - `//+gocover:ignore:file`
-	// - `//+gocover:ignore:block`
+	// - block
+	// - file
 	//
 	// This regexp matches the lines that
-	// starts with zero or more whitespace characters, then follows `//`, and zero or more  whitespace characters,
-	// then `+gocover:ignore:` and either `file` or `block`.
-	IgnoreRegexp = regexp.MustCompile(`^\s*//\s*\+gocover:ignore:(file|block)`)
+	// starts with any characters, then follows `//`, and `+gocover:ignore:` then following either `file` or `block`.
+	IgnoreRegexp = regexp.MustCompile(`.*//\+gocover:ignore:(file|block)`)
 )
 
 // IgnoreType indicates the type of the ignore profile.
@@ -34,12 +33,10 @@ const (
 // IgnoreProfile represents the ignore profiling data for a specific file.
 type IgnoreProfile struct {
 	// type of the ignore profile.
-	// when it's BLOCK_IGNORE, Lines includes all the code line number that should be ignored,
-	// IgnoreBlocks contains the concrete ignore data.
+	// when it's BLOCK_IGNORE, IgnoreBlocks contains the concrete ignore data.
 	Type         IgnoreType
 	Filename     string
-	Lines        map[int]bool
-	IgnoreBlocks []*IgnoreBlock
+	IgnoreBlocks map[cover.ProfileBlock]*IgnoreBlock
 }
 
 // IgnoreBlock represents a single block of ignore profiling data.
@@ -66,77 +63,80 @@ func ParseIgnoreProfiles(fileName string, coverProfile *cover.Profile) (*IgnoreP
 // parseIgnoreProfilesFromReader parses ignore profile data from the Reader and returns a ignore profile.
 func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*IgnoreProfile, error) {
 	s := bufio.NewScanner(rd)
-	lineNumber := 0
-
-	profile := &IgnoreProfile{
-		Lines: make(map[int]bool),
-		Type:  BLOCK_IGNORE,
+	s.Split(bufio.ScanLines)
+	var fileLines []string
+	for s.Scan() {
+		fileLines = append(fileLines, s.Text())
 	}
 
-	for s.Scan() {
-		lineNumber++
-		line := s.Text()
-		match := IgnoreRegexp.FindStringSubmatch(line)
+	profile := &IgnoreProfile{
+		Type:         BLOCK_IGNORE,
+		IgnoreBlocks: make(map[cover.ProfileBlock]*IgnoreBlock),
+	}
 
+	totalLines := len(fileLines)
+	i := 0
+	for i < totalLines {
+		match := IgnoreRegexp.FindStringSubmatch(fileLines[i])
 		// not match, continue next line
 		if match == nil {
+			i++
 			continue
 		}
 
 		// match contains the result of the regexp on IgnoreRegexp
-		// match = ["//+gocover:ignore:file", "file"] when input is `//+gocover:ignore:file`,
-		// match = ["//+gocover:ignore:block", "block"] when input is `//+gocover:ignore:block`,
 		ignoreKind := match[1]
 		if ignoreKind == "file" { // set type to FILE_IGNORE and skip further processing
 			profile.Type = FILE_IGNORE
+			profile.IgnoreBlocks = nil
 			break
 		} else if ignoreKind == "block" { // block
-			ignoreBlockLineCnt := ignoreOnBlock(s, profile, coverProfile, lineNumber, line)
-			lineNumber += ignoreBlockLineCnt
-
-			//+gocover:ignore:block
+			// ignoreOnBlock returns the endline of cover profile block
+			// as index of fileLines starts from 0, the endline is actually the next index that waiting handling.
+			i = ignoreOnBlock(fileLines, profile, coverProfile, i+1, fileLines[i])
 		} else {
-			// actually, here won't happen
+			//+gocover:ignore:block
+			i++
 		}
 	}
 
 	return profile, nil
 }
 
-func ignoreOnBlock(scanner *bufio.Scanner, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string) int {
+// ignoreOnBlock finds the cover profile block that contains the ignore pattern text
+// and returns the line number of the end line of cover profile block
+func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string) int {
 	var profileBlock *cover.ProfileBlock
-	startLine := patternLineNumber + 1
-	// `startLine` is the line number after the annotation line.
-	// Use the `startLine` to find the Profile Block.
-	// Because the two profile blocks may have the same value on startline and endline,
-	// which means that the finding process uses the condition the `startLine` equals to the start line of the block
-	// and less or equal to the end line of the block to find the suitable block.
+
+	// gocover ignore patterns are placed in block like following,
+	// so the line number of it >= start line of code block and <= end line of code block
+	// {  //+gocover:ignore:xxx
+	//    //+gocover:ignore:xxx
+	// }
 	for _, b := range coverProfile.Blocks {
-		if b.StartLine == startLine && startLine <= b.EndLine {
+		if b.StartLine <= patternLineNumber && patternLineNumber < b.EndLine {
 			profileBlock = &b
 			break
 		}
 	}
 
 	if profileBlock == nil {
-		return 0
+		return patternLineNumber + 1
 	}
 
 	ignoreBlock := &IgnoreBlock{Annotation: patternText}
 
-	// Record the ignore code profile contents and its corresponding line number.
-	var content string
+	// Record the ignore code profile contents
 	for i := profileBlock.StartLine; i <= profileBlock.EndLine; i++ {
 		// as the source file of the scanner is same with cover profile,
 		// so this method call always true.
-		scanner.Scan()
-		content = scanner.Text()
-
 		ignoreBlock.Lines = append(ignoreBlock.Lines, i)
-		ignoreBlock.Contents = append(ignoreBlock.Contents, content)
-		profile.Lines[i] = true
+		ignoreBlock.Contents = append(ignoreBlock.Contents, fileLines[i-1])
 	}
 
-	profile.IgnoreBlocks = append(profile.IgnoreBlocks, ignoreBlock)
-	return profileBlock.EndLine - profileBlock.StartLine + 1
+	if _, ok := profile.IgnoreBlocks[*profileBlock]; !ok {
+		profile.IgnoreBlocks[*profileBlock] = ignoreBlock
+	}
+
+	return profileBlock.EndLine
 }

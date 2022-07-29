@@ -167,7 +167,13 @@ func normalizeLines(lines int) string {
 }
 
 func percentCovered(total, covered int) float64 {
-	c := float64(covered) / float64(total) * 100
+	var c float64
+	// total is zero, no need to calculate
+	if total == 0 {
+		c = 100 // Avoid zero denominator.
+	} else {
+		c = float64(covered) / float64(total) * 100
+	}
 	percent, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", c), 64)
 	return percent
 }

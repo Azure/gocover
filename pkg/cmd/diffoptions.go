@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/Azure/gocover/pkg/report"
@@ -19,21 +20,23 @@ type DiffOptions struct {
 	CompareBranch  string
 	RepositoryPath string
 
-	FailureRate  float64
-	ReportFormat string
-	ReportName   string
-	Output       string
-	Excludes     []string
-	Style        string
+	CoverageBaseline float64
+	ReportFormat     string
+	ReportName       string
+	Output           string
+	Excludes         []string
+	Style            string
+
+	Writer io.Writer
 }
 
 // NewDiffOptions returns a Options with default values.
 // TODO: make format as enumerate string type
 func NewDiffOptions() *DiffOptions {
 	return &DiffOptions{
-		CompareBranch: DefaultCompareBranch,
-		ReportFormat:  "html",
-		FailureRate:   20.0,
+		CompareBranch:    DefaultCompareBranch,
+		ReportFormat:     "html",
+		CoverageBaseline: 80.0,
 	}
 }
 
@@ -68,8 +71,11 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("generate report: %w", err)
 	}
 
-	if 100.0-statistics.TotalCoveragePercent >= o.FailureRate {
-		return fmt.Errorf("total coverage pass rate is: %.2f", statistics.TotalCoveragePercent)
+	if statistics.TotalCoveragePercent < o.CoverageBaseline {
+		return fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
+			o.CoverageBaseline,
+			statistics.TotalCoveragePercent,
+		)
 	}
 
 	return nil
