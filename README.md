@@ -1,16 +1,97 @@
-# Project
+# gocover
 
-> This repo has been populated by an initial template to help get you started. Please
-> make sure to update the content to build a great experience for community-building.
+## Overview
 
-`gocover` project aims to provide a tool for generating go test coverage between two git commits. Following graph gives the overview of the process of `gocover`.
-
-Following is an exmaple of how to generate diff coverage report in HTML format, and coverage baseline should be greater than 80%.
-```
-gocover --cover-profile=coverage.out --compare-branch=origin/master --format html --coverage-baseline 80.0 --output coverage.html
-```
+`gocover` is a go unit test coverage explorer and inspector, providing go module level test coverage based on `go test` coverage result, as well as diff coverage between git commits. Plus, the tool supports annotations of ignoring file/[blocks](https://go.dev/blog/cover) at coverage calculation stage.
 
 ![project overview](./docs/images/overview.svg)
+
+## Installation
+
+### Install From Source
+
+- Clone the repo
+- Build Binary
+```bash
+go build .
+```
+
+## Usage
+
+### Run Coverage Check
+
+- Run test and get `coverage.out`
+```bash
+go test -coverprofile=coverage.out
+```
+- Get diff coverage
+```bash
+gocover --cover-profile=coverage.out --compare-branch=origin/master 
+```
+- Get overall coverage
+```bash
+gocover full --cover-profile=coverage.out
+```
+- Check the coverage detail at `coverage.html`
+
+### Set Ignore Annotations
+
+#### Ignore files
+
+Put `//+gocover:ignore:file` at any line in a file to ignore a file at coverage inspection. Note that `//+gocover:ignore:file` has the highest priority, it will overrides other ignoreing annotation.
+
+```go
+//+gocover:ignore:file
+package foo
+func foo() {}
+```
+
+#### Ignore Block
+
+We follow the definition of [basic block](https://go.dev/blog/cover) from `go test` to keep the same logic on coverage calculation.
+
+Note that it is different from the [golang block](https://go.dev/ref/spec#Blocks). If you are not sure about the definition of the block, you can check the detail about every `block` within your change at the `coverage.out` file. Make sure to put the annotation into the `block`.
+
+```go
+package main
+
+import "fmt"
+
+var i, j int = 1, 2
+
+func case1() { //+gocover:ignore:block           -|
+ var c, python, java = true, false, "no!"      // | -> Block ignored
+ fmt.Println(i, j, c, python, java)            //-|
+}
+
+func case2(x int) {//+gocover:ignore:block       -|
+ var c, python, java = true, false, "no!"      // | -> Block ignored
+ if x > 0 {                                    //-|
+  fmt.Println(i, j, c, python, java)
+ }
+
+ fmt.Println(i, j, c, python, java, x)
+}
+
+func case3(x int) {//+gocover:ignore:block       -|
+ var c, python, java = true, false, "no!"      // | -> Block1 ingored
+ if x > 0 { //+gocover:ignore:block              -|
+  fmt.Println(i, j, c, python, java)           // | -> Block2 ingored
+ }                                             //-|
+
+ fmt.Println(i, j, c, python, java, x)
+}
+```
+
+### Get Coverage
+
+Here is how we inspect the coverage:
+
+- **Total Lines:** # of total lines of your change or the entire repo/module.
+- **Ignored Lines:** # of the lines you ignored.
+- **Effictive Lines:** total lines - ignored lines
+- **Covered Lines:** # of the lines covered by test
+- **Coverage:** Covered Lines / Effictive Lines
 
 ## Contributing
 
