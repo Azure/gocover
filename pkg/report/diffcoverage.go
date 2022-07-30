@@ -15,7 +15,7 @@ import (
 
 // DiffCoverage expose the diff coverage statistics
 type DiffCoverage interface {
-	GenerateDiffCoverage() (*Statistics, error)
+	GenerateDiffCoverage() (*Statistics, []*AllInformation, error)
 }
 
 func NewDiffCoverage(
@@ -24,6 +24,7 @@ func NewDiffCoverage(
 	excludes []string,
 	comparedBranch string,
 	repositoryPath string,
+	modulePath string,
 ) (DiffCoverage, error) {
 
 	var excludesRegexps []*regexp.Regexp
@@ -40,7 +41,7 @@ func NewDiffCoverage(
 		profiles:        profiles,
 		changes:         changes,
 		excludesRegexps: excludesRegexps,
-		coverageTree:    NewCoverageTree(""),
+		coverageTree:    NewCoverageTree(modulePath),
 		repositoryPath:  repositoryPath,
 	}, nil
 
@@ -61,11 +62,11 @@ type diffCoverage struct {
 	coverageTree    CoverageTree
 }
 
-func (diff *diffCoverage) GenerateDiffCoverage() (*Statistics, error) {
+func (diff *diffCoverage) GenerateDiffCoverage() (*Statistics, []*AllInformation, error) {
 	diff.ignore()
 	diff.filter()
 	diff.generateIgnoreProfile()
-	return diff.percentCovered(), nil
+	return diff.percentCovered(), diff.coverageTree.All(), nil
 }
 
 // ignore files that not accountting for diff coverage
