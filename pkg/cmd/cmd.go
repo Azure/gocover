@@ -121,7 +121,8 @@ func newDiffCoverageCommand() *cobra.Command {
 
 func newFullCoverageCommand() *cobra.Command {
 	var (
-		moduleHostPath string
+		modulePath     string
+		repositoryPath string
 		coverProfile   string
 	)
 
@@ -136,23 +137,30 @@ func newFullCoverageCommand() *cobra.Command {
 				return fmt.Errorf("parse %s: %s", coverProfile, err)
 			}
 
-			fullCoverage, err := report.NewFullCoverage(profiles, moduleHostPath, []string{})
+			fullCoverage, err := report.NewFullCoverage(profiles, modulePath, repositoryPath, []string{}, cmd.OutOrStdout())
 			if err != nil {
 				return fmt.Errorf("new full coverage: %s", err)
 			}
 
-			all := fullCoverage.BuildFullCoverageTree()
+			all, err := fullCoverage.BuildFullCoverageTree()
+			if err != nil {
+				return fmt.Errorf("build full coverage tree: %s", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", "Summary of coverage:")
 			var coverage float64
 			for _, info := range all {
-				if info.TotalLines == 0 {
+				if info.TotalEffectiveLines == 0 {
 					coverage = 100.0
 				} else {
-					coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+					coverage = float64(info.TotalCoveredLines) / float64(info.TotalEffectiveLines) * 100
 				}
 
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %.1f%%\n",
+				fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %d %d %.1f%%\n",
 					info.Path,
+					info.TotalEffectiveLines,
 					info.TotalCoveredLines,
+					info.TotalIgnoredLines,
 					info.TotalLines,
 					coverage,
 				)
@@ -166,17 +174,19 @@ func newFullCoverageCommand() *cobra.Command {
 
 				now := time.Now().UTC()
 				for _, info := range all {
-					if info.TotalLines == 0 {
+					if info.TotalEffectiveLines == 0 {
 						coverage = 100.0
 					} else {
-						coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+						coverage = float64(info.TotalCoveredLines) / float64(info.TotalEffectiveLines) * 100
 					}
 
 					err = dbClient.Store(context.Background(), &dbclient.Data{
 						PreciseTimestamp: now,
-						LinesCovered:     info.TotalCoveredLines,
-						LinesValid:       info.TotalLines,
-						ModulePath:       moduleHostPath,
+						TotalLines:       info.TotalLines,
+						EffectiveLines:   info.TotalEffectiveLines,
+						IgnoredLines:     info.TotalIgnoredLines,
+						CoveredLines:     info.TotalCoveredLines,
+						ModulePath:       modulePath,
 						FilePath:         info.Path,
 						Coverage:         coverage,
 						CoverageMode:     string(dbclient.FullCoverage),
@@ -192,7 +202,8 @@ func newFullCoverageCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&coverProfile, "cover-profile", "", `coverage profile produced by 'go test'`)
-	cmd.Flags().StringVar(&moduleHostPath, "host-path", "", "host path for the go project")
+	cmd.Flags().StringVar(&repositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&modulePath, "host-path", "", "host path for the go project")
 
 	cmd.MarkFlagRequired("cover-profile")
 
