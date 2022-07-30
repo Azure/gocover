@@ -116,12 +116,10 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string, dbopt DBOption) err
 
 			err = dbClient.Store(context.Background(), &dbclient.Data{
 				PreciseTimestamp: now,
-				LinesCovered:     info.TotalCoveredLines,
-				LinesValid:       info.TotalLines,
 				ModulePath:       o.ModulePath,
 				FilePath:         info.Path,
 				Coverage:         coverage,
-				CoverageKind:     string(dbclient.FullCoverage),
+				CoverageMode:     string(dbclient.FullCoverage),
 			})
 			if err != nil {
 				return fmt.Errorf("store data: %w", err)

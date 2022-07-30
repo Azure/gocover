@@ -168,6 +168,8 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 				node := diff.coverageTree.FindOrCreate(change.FileName)
 				node.TotalLines += int64(coverageProfile.TotalLines)
+				node.TotalEffectiveLines += int64(coverageProfile.TotalEffectiveLines)
+				node.TotalIgnoredLines += int64(coverageProfile.TotalIgnoredLines)
 				node.TotalCoveredLines += int64(coverageProfile.CoveredLines)
 				node.TotalViolationLines += int64(len(coverageProfile.TotalViolationLines))
 				node.CoverageProfile = coverageProfile
@@ -180,6 +182,8 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 				node := diff.coverageTree.FindOrCreate(change.FileName)
 				node.TotalLines += int64(coverageProfile.TotalLines)
+				node.TotalEffectiveLines += int64(coverageProfile.TotalEffectiveLines)
+				node.TotalIgnoredLines += int64(coverageProfile.TotalIgnoredLines)
 				node.TotalCoveredLines += int64(coverageProfile.CoveredLines)
 				node.TotalViolationLines += int64(len(coverageProfile.TotalViolationLines))
 				node.CoverageProfile = coverageProfile
@@ -196,8 +200,10 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 	return &Statistics{
 		ComparedBranch:       diff.comparedBranch,
 		TotalLines:           int(all.TotalLines),
+		TotalEffectiveLines:  int(all.TotalEffectiveLines),
+		TotalIgnoredLines:    int(all.TotalIgnoredLines),
 		TotalCoveredLines:    int(all.TotalCoveredLines),
-		TotalCoveragePercent: float64(all.TotalCoveredLines) / float64(all.TotalLines) * 100,
+		TotalCoveragePercent: float64(all.TotalCoveredLines) / float64(all.TotalEffectiveLines) * 100,
 		TotalViolationLines:  int(all.TotalViolationLines),
 		CoverageProfile:      coverageProfiles,
 	}
@@ -205,7 +211,7 @@ func (diff *diffCoverage) percentCovered() *Statistics {
 
 // generateCoverageProfileWithNewMode generates for new file
 func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.Change, ignoreProfile *annotation.IgnoreProfile) *CoverageProfile {
-	var total, covered int64
+	var total, effectived, covered int64
 
 	sort.Sort(blocksByStart(profile.Blocks))
 
@@ -213,6 +219,7 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
 	// which means that the value of NumStmt is less or equal to the total numbers of the code block.
 	for _, b := range profile.Blocks {
+		total += int64(b.NumStmt)
 
 		if ignoreProfile != nil {
 			if _, ok := ignoreProfile.IgnoreBlocks[b]; ok {
@@ -220,7 +227,7 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 			}
 		}
 
-		total += int64(b.NumStmt)
+		effectived += int64(b.NumStmt)
 		if b.Count > 0 {
 			covered += int64(b.NumStmt)
 		} else {
@@ -233,7 +240,7 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 	}
 
 	// it actually should not happen
-	if total == 0 {
+	if effectived == 0 {
 		return nil
 	}
 
@@ -242,6 +249,8 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 	coverageProfile := &CoverageProfile{
 		FileName:            change.FileName,
 		TotalLines:          int(total),
+		TotalEffectiveLines: int(effectived),
+		TotalIgnoredLines:   int(total - effectived),
 		CoveredLines:        int(covered),
 		TotalViolationLines: violationLines,
 		ViolationSections: []*ViolationSection{
@@ -262,7 +271,7 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 
 	sort.Sort(blocksByStart(profile.Blocks))
 
-	var total, covered int64
+	var total, effectived, covered int64
 	var totalViolationLines []int
 	var violationSections []*ViolationSection
 
@@ -277,14 +286,14 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 				continue
 			}
 
+			total++
 			if ignoreProfile != nil {
 				if _, ok := ignoreProfile.IgnoreBlocks[*block]; ok {
 					continue
 				}
 			}
 
-			// check line?
-			total++
+			effectived++
 			if block.Count > 0 {
 				covered++
 			} else {
@@ -306,13 +315,15 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 
 	}
 
-	if total == 0 {
+	if effectived == 0 {
 		return nil
 	}
 
 	return &CoverageProfile{
 		FileName:            change.FileName,
 		TotalLines:          int(total),
+		TotalEffectiveLines: int(effectived),
+		TotalIgnoredLines:   int(total - effectived),
 		CoveredLines:        int(covered),
 		TotalViolationLines: totalViolationLines,
 		ViolationSections:   violationSections,
