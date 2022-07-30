@@ -11,6 +11,10 @@ type Statistics struct {
 	ComparedBranch string
 	// TotalLines represents the total lines that count for coverage.
 	TotalLines int
+	// TotalEffectiveLines indicates effective lines for the coverage profile.
+	TotalEffectiveLines int
+	// TotalIgnoredLines indicates the lines ignored.
+	TotalIgnoredLines int
 	// TotalCoveredLines indicates total covered lines that count for coverage.
 	TotalCoveredLines int
 	// TotalViolationLines represents all the lines that miss test coverage.
@@ -25,8 +29,12 @@ type Statistics struct {
 type CoverageProfile struct {
 	// FileName indicates which file belongs to this coverage profile.
 	FileName string
-	// TotalLines indicates total lines of this coverage profile.
+	// TotalLines indicates total lines of the entire repo/module.
 	TotalLines int
+	// TotalEffectiveLines indicates effective lines for the coverage profile.
+	TotalEffectiveLines int
+	// TotalIgnoredLines indicates the lines ignored.
+	TotalIgnoredLines int
 	// CoveredLines indicates covered lines of this coverage profile.
 	CoveredLines int
 	// CoveragePercent indicates the diff coverage percent for this file.

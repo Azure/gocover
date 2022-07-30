@@ -26,7 +26,7 @@ go test -coverprofile=coverage.out
 ```
 - Get diff coverage
 ```bash
-gocover --cover-profile=coverage.out --compare-branch=origin/master 
+gocover diff --cover-profile=coverage.out --compare-branch=origin/master 
 ```
 - Get overall coverage
 ```bash

@@ -15,7 +15,7 @@ import (
 
 func TestDiffCoverage(t *testing.T) {
 	t.Run("NewDiffCoverage", func(t *testing.T) {
-		_, err := NewDiffCoverage([]*cover.Profile{}, []*gittool.Change{}, []string{"**"}, "testbranch", "")
+		_, err := NewDiffCoverage([]*cover.Profile{}, []*gittool.Change{}, []string{"**"}, "testbranch", "", "modulePath")
 		if err == nil {
 			t.Error("should return error")
 		}
@@ -27,7 +27,7 @@ func TestDiffCoverage(t *testing.T) {
 				".*github.com/Azure/gocover/report/tool.go",
 				"github.com/Azure/gocover/test/.*",
 				"github.com/Azure/gocover/mock_*",
-			}, "testbranch", "")
+			}, "testbranch", "", "github.com/Azure/gocover")
 		if err != nil {
 			t.Errorf("should not return error: %s", err)
 		}
@@ -180,7 +180,7 @@ func TestDiffCoverage(t *testing.T) {
 				},
 			}
 
-			statistics, err := diff.GenerateDiffCoverage()
+			statistics, _, err := diff.GenerateDiffCoverage()
 			if err != nil {
 				t.Error("should not error")
 			}
