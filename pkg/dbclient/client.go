@@ -11,6 +11,13 @@ const (
 	Kusto ClientType = "Kusto"
 )
 
+type CoverageMode string
+
+const (
+	FullCoverage CoverageMode = "full"
+	DiffCoverage CoverageMode = "diff"
+)
+
 // DbClient interface for storing gocover data.
 type DbClient interface {
 	Store(context context.Context, data *Data) error
@@ -21,6 +28,7 @@ type Data struct {
 	LinesCovered     int64     `json:"linesCovered"`     // unit test covered lines
 	LinesValid       int64     `json:"linesValid"`       // unit test total lines
 	Coverage         float64   `json:"coverage"`         // unit test coverage, LinesCovered / LinesValid
+	CoverageMode     string    `json:"coverageMode"`     // coverage mode, diff or full subcommand
 	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
 	FilePath         string    `json:"filePath"`         // file path for a concrete file or directory
 

@@ -152,6 +152,13 @@ var basicMappings = []mapping{
 			Path: "$.filePath",
 		},
 	},
+	{
+		Column:   "coverageMode",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.coverageMode",
+		},
+	},
 }
 
 // KustoOption wraps the credential and kusto server information for building kusto client.
@@ -173,11 +180,6 @@ type KustoOption struct {
 
 // Validate checks the validation of the input on kusto option.
 func (o *KustoOption) Validate() error {
-	// don't use kusto as storage, return directly
-	// if !o.UseKusto {
-	// 	return nil
-	// }
-
 	if o.tenantID = os.Getenv(tenantIDKey); o.tenantID == "" {
 		return fmt.Errorf("%s %w", tenantIDKey, ErrEnvRequired)
 	}

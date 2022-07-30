@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/spf13/cobra"
@@ -19,6 +22,7 @@ type DiffOptions struct {
 	CoverProfile   string
 	CompareBranch  string
 	RepositoryPath string
+	ModulePath     string
 
 	CoverageBaseline float64
 	ReportFormat     string
@@ -42,7 +46,8 @@ func NewDiffOptions() *DiffOptions {
 
 // Run do the actual actions on diff coverage.
 // TODO: improve it.
-func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
+func (o *DiffOptions) Run(cmd *cobra.Command, args []string, dbopt DBOption) error {
+	o.Writer = cmd.OutOrStdout()
 	profiles, err := cover.ParseProfiles(o.CoverProfile)
 	if err != nil {
 		return fmt.Errorf("parse coverage profile: %w", err)
@@ -57,26 +62,72 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("git diff: %w", err)
 	}
 
-	diffCoverage, err := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch, o.RepositoryPath)
+	diffCoverage, err := report.NewDiffCoverage(profiles, changes, o.Excludes, o.CompareBranch, o.RepositoryPath, o.ModulePath)
 	if err != nil {
 		return fmt.Errorf("new diff converage: %w", err)
 	}
-	statistics, err := diffCoverage.GenerateDiffCoverage()
+	statistics, all, err := diffCoverage.GenerateDiffCoverage()
 	if err != nil {
 		return fmt.Errorf("diff coverage: %w", err)
 	}
 
-	g := report.NewReportGenerator(statistics, o.Style, o.Output, o.ReportName)
+	g := report.NewReportGenerator(statistics, o.Style, o.Output, o.ReportName, o.Writer)
 	if err := g.GenerateReport(); err != nil {
 		return fmt.Errorf("generate report: %w", err)
 	}
 
+	var finalError error = nil
 	if statistics.TotalCoveragePercent < o.CoverageBaseline {
-		return fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
+		finalError = fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
 			o.CoverageBaseline,
 			statistics.TotalCoveragePercent,
 		)
 	}
 
-	return nil
+	var coverage float64
+	for _, info := range all {
+		if info.TotalLines == 0 {
+			coverage = 100.0
+		} else {
+			coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+		}
+
+		fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %.1f%%\n",
+			info.Path,
+			info.TotalCoveredLines,
+			info.TotalLines,
+			coverage,
+		)
+	}
+
+	if dbOption.DataCollectionEnabled {
+		dbClient, err := dbOption.GetDbClient()
+		if err != nil {
+			return fmt.Errorf("new db client: %w", err)
+		}
+
+		now := time.Now().UTC()
+		for _, info := range all {
+			if info.TotalLines == 0 {
+				coverage = 100.0
+			} else {
+				coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+			}
+
+			err = dbClient.Store(context.Background(), &dbclient.Data{
+				PreciseTimestamp: now,
+				LinesCovered:     info.TotalCoveredLines,
+				LinesValid:       info.TotalLines,
+				ModulePath:       o.ModulePath,
+				FilePath:         info.Path,
+				Coverage:         coverage,
+				CoverageMode:     string(dbclient.FullCoverage),
+			})
+			if err != nil {
+				return fmt.Errorf("store data: %w", err)
+			}
+		}
+	}
+
+	return finalError
 }

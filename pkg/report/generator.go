@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,6 +33,8 @@ type htmlReportGenerator struct {
 	outputPath string
 	// reportName report name
 	reportName string
+	// io writer
+	writer io.Writer
 }
 
 var _ ReportGenerator = (*htmlReportGenerator)(nil)
@@ -49,6 +52,7 @@ func NewReportGenerator(
 	codeStyle string,
 	outputPath string,
 	reportName string,
+	writer io.Writer,
 ) ReportGenerator {
 	style := styles.Get(codeStyle)
 	if style == nil {
@@ -66,6 +70,7 @@ func NewReportGenerator(
 		style:      style,
 		outputPath: outputPath,
 		reportName: reportName,
+		writer:     writer,
 	}
 }
 
@@ -88,6 +93,7 @@ func (g *htmlReportGenerator) GenerateReport() error {
 		return fmt.Errorf("write report: %w", err)
 	}
 
+	fmt.Fprintf(g.writer, "write report to %s \n", reportFile)
 	return nil
 }
 
