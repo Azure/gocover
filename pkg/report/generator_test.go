@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 
 func TestNewReportGenerator(t *testing.T) {
 	t.Run("NewReportGenerator", func(t *testing.T) {
-		NewReportGenerator(&Statistics{}, "colorful", "", "")
+		NewReportGenerator(&Statistics{}, "colorful", "", "", &bytes.Buffer{})
 	})
 }
 
@@ -30,6 +31,7 @@ func TestGenerateReport(t *testing.T) {
 			statistics: &Statistics{
 				ComparedBranch: "origin/master",
 			},
+			writer: &bytes.Buffer{},
 		}
 
 		err := g.GenerateReport()
@@ -93,6 +95,7 @@ func TestGenerateReport(t *testing.T) {
 			outputPath: path,
 			reportName: "corverage.html",
 			statistics: statistics,
+			writer:     &bytes.Buffer{},
 		}
 
 		err := g.GenerateReport()
