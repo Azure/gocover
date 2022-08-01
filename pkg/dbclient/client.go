@@ -25,9 +25,11 @@ type DbClient interface {
 
 type Data struct {
 	PreciseTimestamp time.Time `json:"preciseTimestamp"` // time send to db
-	LinesCovered     int64     `json:"linesCovered"`     // unit test covered lines
-	LinesValid       int64     `json:"linesValid"`       // unit test total lines
-	Coverage         float64   `json:"coverage"`         // unit test coverage, LinesCovered / LinesValid
+	TotalLines       int64     `json:"totalLines"`       // total lines of the entire repo/module.
+	EffectiveLines   int64     `json:"effectiveLines"`   // the lines for coverage base, total lines - ignored lines
+	IgnoredLines     int64     `json:"ignoredLines"`     // the lines ignored.
+	CoveredLines     int64     `json:"coveredLines"`     // the lines covered by test
+	Coverage         float64   `json:"coverage"`         // unit test coverage, CoveredLines / EffectiveLines
 	CoverageMode     string    `json:"coverageMode"`     // coverage mode, diff or full subcommand
 	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
 	FilePath         string    `json:"filePath"`         // file path for a concrete file or directory

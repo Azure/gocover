@@ -95,72 +95,6 @@ func (client *KustoClient) Store(ctx context.Context, data *Data) error {
 	return nil
 }
 
-// properties used for kusto transform on json data.
-type properties struct {
-	Path      string `json:"Path"`
-	Transform string `json:"Transform,omitempty"`
-}
-
-// mapping used to build mapping between kusto column and json data field.
-type mapping struct {
-	Column     string     `json:"Column"`
-	Datatype   string     `json:"Datatype,omitempty"`
-	Properties properties `json:"Properties"`
-}
-
-// basicMappings gives the fundemental mappings for Data struct and kusto table
-var basicMappings = []mapping{
-	{
-		Column:   "preciseTimestamp",
-		Datatype: "datetime",
-		Properties: properties{
-			Path: "$.preciseTimestamp",
-		},
-	},
-	{
-		Column:   "coverage",
-		Datatype: "real",
-		Properties: properties{
-			Path: "$.coverage",
-		},
-	},
-	{
-		Column:   "linesCovered",
-		Datatype: "long",
-		Properties: properties{
-			Path: "$.linesCovered",
-		},
-	},
-	{
-		Column:   "linesValid",
-		Datatype: "long",
-		Properties: properties{
-			Path: "$.linesValid",
-		},
-	},
-	{
-		Column:   "modulePath",
-		Datatype: "string",
-		Properties: properties{
-			Path: "$.modulePath",
-		},
-	},
-	{
-		Column:   "filePath",
-		Datatype: "string",
-		Properties: properties{
-			Path: "$.filePath",
-		},
-	},
-	{
-		Column:   "coverageMode",
-		Datatype: "string",
-		Properties: properties{
-			Path: "$.coverageMode",
-		},
-	},
-}
-
 // KustoOption wraps the credential and kusto server information for building kusto client.
 type KustoOption struct {
 	UseKusto      bool
@@ -238,4 +172,84 @@ func (o *KustoOption) Validate() error {
 	}
 
 	return nil
+}
+
+// properties used for kusto transform on json data.
+type properties struct {
+	Path      string `json:"Path"`
+	Transform string `json:"Transform,omitempty"`
+}
+
+// mapping used to build mapping between kusto column and json data field.
+type mapping struct {
+	Column     string     `json:"Column"`
+	Datatype   string     `json:"Datatype,omitempty"`
+	Properties properties `json:"Properties"`
+}
+
+// basicMappings gives the fundemental mappings for Data struct and kusto table
+var basicMappings = []mapping{
+	{
+		Column:   "preciseTimestamp",
+		Datatype: "datetime",
+		Properties: properties{
+			Path: "$.preciseTimestamp",
+		},
+	},
+	{
+		Column:   "coverage",
+		Datatype: "real",
+		Properties: properties{
+			Path: "$.coverage",
+		},
+	},
+	{
+		Column:   "totalLines",
+		Datatype: "long",
+		Properties: properties{
+			Path: "$.totalLines",
+		},
+	},
+	{
+		Column:   "effectiveLines",
+		Datatype: "long",
+		Properties: properties{
+			Path: "$.effectiveLines",
+		},
+	},
+	{
+		Column:   "ignoredLines",
+		Datatype: "long",
+		Properties: properties{
+			Path: "$.ignoredLines",
+		},
+	},
+	{
+		Column:   "coveredLines",
+		Datatype: "long",
+		Properties: properties{
+			Path: "$.coveredLines",
+		},
+	},
+	{
+		Column:   "modulePath",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.modulePath",
+		},
+	},
+	{
+		Column:   "filePath",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.filePath",
+		},
+	},
+	{
+		Column:   "coverageMode",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.coverageMode",
+		},
+	},
 }

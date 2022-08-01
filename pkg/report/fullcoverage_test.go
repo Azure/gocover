@@ -1,6 +1,7 @@
 package report
 
 import (
+	"bytes"
 	"regexp"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 
 func TestFullCoverage(t *testing.T) {
 	t.Run("NewFullCoverage", func(t *testing.T) {
-		_, err := NewFullCoverage([]*cover.Profile{}, "github.com/Azure/gocover", []string{"**"})
+		_, err := NewFullCoverage([]*cover.Profile{}, "github.com/Azure/gocover", "", []string{"**"}, &bytes.Buffer{})
 		if err == nil {
 			t.Error("should return error")
 		}
@@ -17,11 +18,12 @@ func TestFullCoverage(t *testing.T) {
 		diff, err := NewFullCoverage(
 			[]*cover.Profile{},
 			"github.com/Azure/gocover",
+			"",
 			[]string{
 				".*github.com/Azure/gocover/report/tool.go",
 				"github.com/Azure/gocover/test/.*",
 				"github.com/Azure/gocover/mock_*",
-			})
+			}, &bytes.Buffer{})
 		if err != nil {
 			t.Errorf("should not return error: %s", err)
 		}

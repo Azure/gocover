@@ -93,7 +93,7 @@ func (g *htmlReportGenerator) GenerateReport() error {
 		return fmt.Errorf("write report: %w", err)
 	}
 
-	fmt.Fprintf(g.writer, "write report to %s \n", reportFile)
+	fmt.Fprintf(g.writer, "Write report to %s \n", reportFile)
 	return nil
 }
 

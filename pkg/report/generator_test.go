@@ -57,19 +57,25 @@ func TestGenerateReport(t *testing.T) {
 
 		statistics := &Statistics{
 			ComparedBranch:       "origin/master",
-			TotalLines:           6,
+			TotalLines:           8,
+			TotalEffectiveLines:  6,
+			TotalIgnoredLines:    2,
 			TotalViolationLines:  2,
 			TotalCoveragePercent: 70,
 			CoverageProfile: []*CoverageProfile{
 				{
-					FileName:     "foo.txt",
-					CoveredLines: 20,
-					TotalLines:   20,
+					FileName:            "foo.txt",
+					TotalLines:          20,
+					TotalEffectiveLines: 20,
+					TotalIgnoredLines:   0,
+					CoveredLines:        20,
 				},
 				{
 					FileName:            "bar.txt",
 					CoveredLines:        8,
-					TotalLines:          10,
+					TotalIgnoredLines:   2,
+					TotalEffectiveLines: 10,
+					TotalLines:          12,
 					TotalViolationLines: []int{2, 10},
 					ViolationSections: []*ViolationSection{
 						{

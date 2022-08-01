@@ -2,6 +2,7 @@ package report
 
 import (
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -38,9 +39,12 @@ func TestDiffCoverage(t *testing.T) {
 
 	t.Run("GenerateDiffCoverage", func(t *testing.T) {
 		t.Run("generate percent coverage", func(t *testing.T) {
+			repositoryPath := t.TempDir()
+
 			diff := &diffCoverage{
 				coverageTree:   NewCoverageTree(""),
 				comparedBranch: "origin/main",
+				repositoryPath: repositoryPath,
 				profiles: []*cover.Profile{
 					{
 						FileName: "github.com/Azure/gocover/report/utils.go",
@@ -180,9 +184,15 @@ func TestDiffCoverage(t *testing.T) {
 				},
 			}
 
+			os.MkdirAll(filepath.Join(repositoryPath, "report"), os.ModePerm)
+			ioutil.WriteFile(filepath.Join(repositoryPath, "report/tool.go"), []byte("tool"), 0644)
+			ioutil.WriteFile(filepath.Join(repositoryPath, "report/common.go"), []byte("common"), 0644)
+			ioutil.WriteFile(filepath.Join(repositoryPath, "report/rename.go"), []byte("rename"), 0644)
+			ioutil.WriteFile(filepath.Join(repositoryPath, "report/delete.go"), []byte("delete"), 0644)
+
 			statistics, _, err := diff.GenerateDiffCoverage()
 			if err != nil {
-				t.Error("should not error")
+				t.Errorf("should not error, but get %s", err)
 			}
 			if statistics == nil {
 				t.Error("should return Statistics, but get nil")
@@ -655,12 +665,15 @@ func TestGenerateCoverageProfileWithNewMode(t *testing.T) {
 		if coverageProfile.FileName != "report/tool.go" {
 			t.Errorf("expect filename %s, but get %s", "report/tool.go", coverageProfile.FileName)
 		}
-		c := float64(coverageProfile.CoveredLines) / float64(coverageProfile.TotalLines) * 100
+		c := float64(coverageProfile.CoveredLines) / float64(coverageProfile.TotalEffectiveLines) * 100
 		if c != 50.0 {
 			t.Errorf("coverage percent shoud be 50, but get %f", c)
 		}
-		if coverageProfile.TotalLines != 6 {
-			t.Errorf("total lines should be 6, but get %d", coverageProfile.TotalLines)
+		if coverageProfile.TotalLines != 9 {
+			t.Errorf("total lines should be 9, but get %d", coverageProfile.TotalLines)
+		}
+		if coverageProfile.TotalLines != 9 {
+			t.Errorf("total lines should be 9, but get %d", coverageProfile.TotalEffectiveLines)
 		}
 		if coverageProfile.CoveredLines != 3 {
 			t.Errorf("covered lines should be 3, but get %d", coverageProfile.CoveredLines)

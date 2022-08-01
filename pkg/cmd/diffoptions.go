@@ -45,7 +45,6 @@ func NewDiffOptions() *DiffOptions {
 }
 
 // Run do the actual actions on diff coverage.
-// TODO: improve it.
 func (o *DiffOptions) Run(cmd *cobra.Command, args []string, dbopt DBOption) error {
 	o.Writer = cmd.OutOrStdout()
 	profiles, err := cover.ParseProfiles(o.CoverProfile)
@@ -84,17 +83,20 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string, dbopt DBOption) err
 		)
 	}
 
+	fmt.Fprintf(cmd.OutOrStdout(), "%s\n", "Summary of coverage:")
 	var coverage float64
 	for _, info := range all {
-		if info.TotalLines == 0 {
+		if info.TotalEffectiveLines == 0 {
 			coverage = 100.0
 		} else {
-			coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+			coverage = float64(info.TotalCoveredLines) / float64(info.TotalEffectiveLines) * 100
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %.1f%%\n",
+		fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %d %d %.1f%%\n",
 			info.Path,
+			info.TotalEffectiveLines,
 			info.TotalCoveredLines,
+			info.TotalIgnoredLines,
 			info.TotalLines,
 			coverage,
 		)
@@ -108,20 +110,22 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string, dbopt DBOption) err
 
 		now := time.Now().UTC()
 		for _, info := range all {
-			if info.TotalLines == 0 {
+			if info.TotalEffectiveLines == 0 {
 				coverage = 100.0
 			} else {
-				coverage = float64(info.TotalCoveredLines) / float64(info.TotalLines) * 100
+				coverage = float64(info.TotalCoveredLines) / float64(info.TotalEffectiveLines) * 100
 			}
 
 			err = dbClient.Store(context.Background(), &dbclient.Data{
 				PreciseTimestamp: now,
-				LinesCovered:     info.TotalCoveredLines,
-				LinesValid:       info.TotalLines,
+				TotalLines:       info.TotalLines,
+				EffectiveLines:   info.TotalEffectiveLines,
+				IgnoredLines:     info.TotalIgnoredLines,
+				CoveredLines:     info.TotalCoveredLines,
 				ModulePath:       o.ModulePath,
 				FilePath:         info.Path,
 				Coverage:         coverage,
-				CoverageMode:     string(dbclient.FullCoverage),
+				CoverageMode:     string(dbclient.DiffCoverage),
 			})
 			if err != nil {
 				return fmt.Errorf("store data: %w", err)
