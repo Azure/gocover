@@ -8,6 +8,10 @@
 
 ## Installation
 
+### Install From Release
+
+- Download the latest [Release](https://github.com/Azure/gocover/releases) and extract it. 
+
 ### Install From Source
 
 - Clone the repo
@@ -18,20 +22,37 @@ go build .
 
 ## Usage
 
+### Definition
+
+Here is how we inspect the test coverage:
+
+- **Total Lines:** # of total lines of your change or the entire repo/module.
+- **Ignored Lines:** # of the lines you ignored.
+- **Effictive Lines:** total lines - ignored lines
+- **Covered Lines:** # of the lines covered by test
+- **Coverage:** Covered Lines / Effictive Lines
+
 ### Run Coverage Check
 
 - Run test and get `coverage.out`
+
 ```bash
 go test -coverprofile=coverage.out
 ```
 - Get diff coverage
+
+You need to commit the change to your branch before running `go test`. 
+
 ```bash
-gocover diff --cover-profile=coverage.out --compare-branch=origin/master 
+gocover diff --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}coverage.out --compare-branch=origin/master 
 ```
+
 - Get overall coverage
+
 ```bash
-gocover full --cover-profile=coverage.out
+gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}coverage.out
 ```
+
 - Check the coverage detail at `coverage.html`
 
 ### Set Ignore Annotations
@@ -83,15 +104,25 @@ func case3(x int) {//+gocover:ignore:block       -|
 }
 ```
 
-### Get Coverage
+## Advanced Usage
 
-Here is how we inspect the coverage:
+### Commands
 
-- **Total Lines:** # of total lines of your change or the entire repo/module.
-- **Ignored Lines:** # of the lines you ignored.
-- **Effictive Lines:** total lines - ignored lines
-- **Covered Lines:** # of the lines covered by test
-- **Coverage:** Covered Lines / Effictive Lines
+| Command Options | Definition |
+| --- | --- |
+| —cover-profile | Coverage profile produced by 'go test’ |
+| —repository-path | The root path of repository |
+| —host-path | The host path for the go project |
+
+- Diff Coverage
+
+| Command Options | Definition |
+| --- | --- |
+| —branch-to-compare | branch to compare |
+| —coverage-baseline | The tool will return an error code if coverage is less than coverage baseline(%) |
+| —output | Diff coverage output file |
+| —format | Format of the diff coverage report, one of: html, json, markdown |
+| —excludes | Exclude files for diff coverage inspection |
 
 ## Contributing
 
