@@ -22,7 +22,7 @@ go build .
 
 - Run test and get `coverage.out`
 ```bash
-go test -coverprofile=coverage.out
+go test ./... -coverprofile=coverage.out
 ```
 - Get diff coverage
 ```bash
