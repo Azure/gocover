@@ -26,8 +26,8 @@ go build .
 
 Here is how we inspect the test coverage:
 
-- **Total Lines:** # of total lines of your change or the entire repo/module.
-- **Ignored Lines:** # of the lines you ignored.
+- **Total Lines:** # of total lines of your change or the entire repo/module
+- **Ignored Lines:** # of the lines you ignored
 - **Effictive Lines:** total lines - ignored lines
 - **Covered Lines:** # of the lines covered by test
 - **Coverage:** Covered Lines / Effictive Lines
@@ -55,7 +55,11 @@ gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}cover
 
 - Check the coverage detail at `coverage.html`
 
+- Note: Before the coverage inspection, we will check whether a _test.go file exist within each go module. 
+
 ### Set Ignore Annotations
+
+Use `//+gocover:ignore:file` or `//+gocover:ignore:block` as annotation, do not add any space among words.
 
 #### Ignore files
 
@@ -71,7 +75,8 @@ func foo() {}
 
 We follow the definition of [basic block](https://go.dev/blog/cover) from `go test` to keep the same logic on coverage calculation.
 
-Note that it is different from the [golang block](https://go.dev/ref/spec#Blocks). If you are not sure about the definition of the block, you can check the detail about every `block` within your change at the `coverage.out` file. Make sure to put the annotation into the `block`.
+- Note: The `block` is different from the [golang block](https://go.dev/ref/spec#Blocks). If you are not sure about the definition of the block, you can check the detail about every `block` within your change at the `coverage.out` file. Make sure to put the annotation into the `block`.
+- Note: As we use # of lines in coverage calculation, there is a special case that a single line falling into several blocks. In this case, if any part of a line falls into an ignored block, the line will be regard as an ignored line. You can check it at function `case5` in the following examples. 
 
 ```go
 package main
@@ -81,12 +86,12 @@ import "fmt"
 var i, j int = 1, 2
 
 func case1() { //+gocover:ignore:block           -|
- var c, python, java = true, false, "no!"      // | -> Block ignored
+ var c, python, java = true, false, "no!"      // | -> Lines ignored
  fmt.Println(i, j, c, python, java)            //-|
 }
 
 func case2(x int) {//+gocover:ignore:block       -|
- var c, python, java = true, false, "no!"      // | -> Block ignored
+ var c, python, java = true, false, "no!"      // | -> Lines ignored
  if x > 0 {                                    //-|
   fmt.Println(i, j, c, python, java)
  }
@@ -95,12 +100,28 @@ func case2(x int) {//+gocover:ignore:block       -|
 }
 
 func case3(x int) {//+gocover:ignore:block       -|
- var c, python, java = true, false, "no!"      // | -> Block1 ingored
+ var c, python, java = true, false, "no!"      // | -> Lines ingored - Block1
  if x > 0 { //+gocover:ignore:block              -|
-  fmt.Println(i, j, c, python, java)           // | -> Block2 ingored
+  fmt.Println(i, j, c, python, java)           // | -> Lines ingored - Block2
  }                                             //-|
 
  fmt.Println(i, j, c, python, java, x)
+}
+
+func case4(func() int) {
+	{ //+gocover:ignore:block                    -|
+		fmt.Printf("A")                        // |
+		fmt.Printf("A")                        // | -> Lines ignored
+		fmt.Printf("A")                        // |
+	}                                          //-|
+	fmt.Printf("A")
+}
+
+func case5(x int) {                            //-|
+	//+gocover:ignore:block                       | 
+	case6(func() int {                         //-| -> Lines ignored
+		return 1
+	})
 }
 ```
 
