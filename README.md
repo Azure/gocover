@@ -37,7 +37,7 @@ Here is how we inspect the test coverage:
 - Run test and get `coverage.out`
 
 ```bash
-go test -coverprofile=coverage.out
+go test ./... -coverprofile=coverage.out
 ```
 - Get diff coverage
 
@@ -55,7 +55,7 @@ gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}cover
 
 - Check the coverage detail at `coverage.html`
 
-- Note: Before the coverage inspection, we will check whether a _test.go file exist within each go module. 
+- Note: Before the coverage inspection, we will check whether a _test.go file exist within each package. 
 
 ### Set Ignore Annotations
 
@@ -63,7 +63,7 @@ Use `//+gocover:ignore:file` or `//+gocover:ignore:block` as annotation, do not 
 
 #### Ignore files
 
-Put `//+gocover:ignore:file` at any line in a file to ignore a file at coverage inspection. Note that `//+gocover:ignore:file` has the highest priority, it will overrides other ignoreing annotation.
+Put `//+gocover:ignore:file` at any line in a file to ignore a file at coverage inspection. Note that `//+gocover:ignore:file` has the highest priority, it will overrides other ignoring annotation.
 
 ```go
 //+gocover:ignore:file
