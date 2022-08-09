@@ -1,7 +1,9 @@
 package report
 
 import (
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -11,6 +13,8 @@ import (
 	"github.com/Azure/gocover/pkg/gittool"
 	"golang.org/x/tools/cover"
 )
+
+var ErrNoTestFile = errors.New("no test files")
 
 // DiffCoverage expose the diff coverage statistics
 type DiffCoverage interface {
@@ -33,6 +37,17 @@ func NewDiffCoverage(
 			return nil, fmt.Errorf("compile pattern %s: %w", ignorePattern, err)
 		}
 		excludesRegexps = append(excludesRegexps, reg)
+	}
+
+	for _, c := range changes {
+		folder := filepath.Dir(filepath.Join(repositoryPath, c.FileName))
+		exist, err := checkTestFileExistence(folder)
+		if err != nil {
+			return nil, fmt.Errorf("checkTestFileExistence: %w", err)
+		}
+		if !exist {
+			return nil, fmt.Errorf("%w in %s", ErrNoTestFile, folder)
+		}
 	}
 
 	return &diffCoverage{
@@ -211,6 +226,8 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 
 	sort.Sort(blocksByStart(profile.Blocks))
 
+	ignoreLines := make(map[int]bool)
+
 	violationsMap := make(map[int]bool)
 	// NumStmt indicates the number of statements in a code block, it does not means the line, because a statement may have several lines,
 	// which means that the value of NumStmt is less or equal to the total numbers of the code block.
@@ -219,6 +236,9 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 
 		if ignoreProfile != nil {
 			if _, ok := ignoreProfile.IgnoreBlocks[b]; ok {
+				for lineNum := b.StartLine; lineNum <= b.EndLine; lineNum++ {
+					ignoreLines[lineNum] = true
+				}
 				continue
 			}
 		}
@@ -229,7 +249,9 @@ func generateCoverageProfileWithNewMode(profile *cover.Profile, change *gittool.
 		} else {
 
 			for lineNum := b.StartLine; lineNum <= b.EndLine; lineNum++ {
-				violationsMap[lineNum] = true
+				if _, ok := ignoreLines[lineNum]; !ok {
+					violationsMap[lineNum] = true
+				}
 			}
 
 		}
@@ -267,6 +289,8 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 
 	sort.Sort(blocksByStart(profile.Blocks))
 
+	ignoreLines := make(map[int]bool)
+
 	var total, effectived, covered int64
 	var totalViolationLines []int
 	var violationSections []*ViolationSection
@@ -285,8 +309,16 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 			total++
 			if ignoreProfile != nil {
 				if _, ok := ignoreProfile.IgnoreBlocks[*block]; ok {
+					for lineNum := block.StartLine; lineNum <= block.EndLine; lineNum++ {
+						ignoreLines[lineNum] = true
+					}
 					continue
 				}
+			}
+
+			// handle the case the multiple blocks are share one line: f(func() int { return 1 })
+			if _, ok := ignoreLines[lineNum]; ok {
+				continue
 			}
 
 			effectived++
@@ -330,6 +362,7 @@ func generateCoverageProfileWithModifyMode(profile *cover.Profile, change *gitto
 // as a profile block has start line and end line, we use binary search to search for it using start line first,
 // then validate the end line.
 func findProfileBlock(blocks []cover.ProfileBlock, lineNumber int, line string) *cover.ProfileBlock {
+
 	idx := sort.Search(len(blocks), func(i int) bool {
 		return blocks[i].StartLine >= lineNumber
 	})
@@ -359,6 +392,25 @@ func findProfileBlock(blocks []cover.ProfileBlock, lineNumber int, line string) 
 		idx--
 	}
 	return nil
+}
+
+func checkTestFileExistence(folder string) (bool, error) {
+	files, err := ioutil.ReadDir(folder)
+	if err != nil {
+		return false, fmt.Errorf("%w", err)
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+
+		if strings.HasSuffix(strings.ToLower(f.Name()), "_test.go") {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 // findChange find the expected change by file name.

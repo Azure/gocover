@@ -323,8 +323,8 @@ func TestIgnoreOnblock(t *testing.T) {
 		if profile.IgnoreBlocks == nil {
 			t.Errorf("should find cover profile block")
 		}
-		if nextUnProccessingLineNumber != coverProfile.Blocks[0].EndLine {
-			t.Errorf("next unprocessing line number should %d, but %d", coverProfile.Blocks[0].EndLine, nextUnProccessingLineNumber)
+		if nextUnProccessingLineNumber != coverProfile.Blocks[0].EndLine-1 {
+			t.Errorf("next unprocessing line number should %d, but %d", coverProfile.Blocks[0].EndLine-1, nextUnProccessingLineNumber)
 		}
 
 		ignoreBlock, ok := profile.IgnoreBlocks[coverProfile.Blocks[0]]
@@ -351,6 +351,125 @@ func TestIgnoreOnblock(t *testing.T) {
 		nextUnProccessingLineNumber := ignoreOnBlock(fileLines, profile, coverProfile, 8, "//+gocover:ignore:block")
 		if nextUnProccessingLineNumber != 9 {
 			t.Errorf("next unprocessing line number should %d, but %d", 9, nextUnProccessingLineNumber)
+		}
+	})
+}
+
+// Test case for ignore block, example file and corresponding cover profile,
+// the results should have 5 ignore blocks.
+/** filename: github.com/Azure/gocover/pkg/report/util.go
+package report
+
+import "fmt"
+
+var i, j int = 3, 3
+
+func case1() { //+gocover:ignore:block
+	var c, python, java = true, false, "no!"
+	fmt.Println(i, j, c, python, java)
+}
+
+func case2(x int) { //+gocover:ignore:block
+	var c, python, java = true, false, "yes!"
+	if x > 0 {
+		fmt.Println(i, j, c, python, java)
+	}
+	fmt.Println(i, j, c, python, java, x)
+}
+
+func case3(x int) { //+gocover:ignore:block
+	var c, python, java = true, false, "yes!"
+	if x > 0 { //+gocover:ignore:block
+		fmt.Println(i, j, c, python, java)
+	}
+	fmt.Println(i, j, c, python, java, x)
+}
+
+func case4(x int) {
+	var c, python, java = true, false, "yes!"
+	if x > 0 { //+gocover:ignore:block
+		fmt.Println(i, j, c, python, java)
+	}
+	fmt.Println(i, j, c, python, java, x)
+}
+**/
+
+// github.com/Azure/gocover/pkg/report/util.go:7.14,10.2 2 0
+// github.com/Azure/gocover/pkg/report/util.go:12.19,14.11 2 0
+// github.com/Azure/gocover/pkg/report/util.go:17.2,17.39 1 0
+// github.com/Azure/gocover/pkg/report/util.go:14.11,16.3 1 0
+// github.com/Azure/gocover/pkg/report/util.go:20.19,22.11 2 0
+// github.com/Azure/gocover/pkg/report/util.go:25.2,25.39 1 0
+// github.com/Azure/gocover/pkg/report/util.go:22.11,24.3 1 0
+// github.com/Azure/gocover/pkg/report/util.go:28.19,30.11 2 0
+// github.com/Azure/gocover/pkg/report/util.go:33.2,33.39 1 0
+// github.com/Azure/gocover/pkg/report/util.go:30.11,32.3 1 0
+
+func TestIgnoreBlock(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		fileContents := `package report
+
+import "fmt"
+
+var i, j int = 3, 3
+
+func case1() { //+gocover:ignore:block
+	var c, python, java = true, false, "no!"
+	fmt.Println(i, j, c, python, java)
+}
+
+func case2(x int) { //+gocover:ignore:block
+	var c, python, java = true, false, "yes!"
+	if x > 0 {
+		fmt.Println(i, j, c, python, java)
+	}
+	fmt.Println(i, j, c, python, java, x)
+}
+
+func case3(x int) { //+gocover:ignore:block
+	var c, python, java = true, false, "yes!"
+	if x > 0 { //+gocover:ignore:block
+		fmt.Println(i, j, c, python, java)
+	}
+	fmt.Println(i, j, c, python, java, x)
+}
+
+func case4(x int) {
+	var c, python, java = true, false, "yes!"
+	if x > 0 { //+gocover:ignore:block
+		fmt.Println(i, j, c, python, java)
+	}
+	fmt.Println(i, j, c, python, java, x)
+}
+	`
+
+		coverProfile := &cover.Profile{
+			Blocks: []cover.ProfileBlock{
+				{StartLine: 7, StartCol: 14, EndLine: 10, EndCol: 2, NumStmt: 2, Count: 0},
+				{StartLine: 12, StartCol: 19, EndLine: 14, EndCol: 11, NumStmt: 2, Count: 0},
+				{StartLine: 17, StartCol: 2, EndLine: 17, EndCol: 39, NumStmt: 1, Count: 0},
+				{StartLine: 14, StartCol: 11, EndLine: 16, EndCol: 3, NumStmt: 1, Count: 0},
+				{StartLine: 20, StartCol: 19, EndLine: 22, EndCol: 11, NumStmt: 2, Count: 0},
+				{StartLine: 25, StartCol: 2, EndLine: 25, EndCol: 39, NumStmt: 1, Count: 0},
+				{StartLine: 22, StartCol: 11, EndLine: 24, EndCol: 3, NumStmt: 1, Count: 0},
+				{StartLine: 28, StartCol: 19, EndLine: 30, EndCol: 11, NumStmt: 2, Count: 0},
+				{StartLine: 33, StartCol: 2, EndLine: 33, EndCol: 39, NumStmt: 1, Count: 0},
+				{StartLine: 30, StartCol: 11, EndLine: 32, EndCol: 3, NumStmt: 1, Count: 0},
+			},
+		}
+
+		r := bytes.NewReader([]byte(fileContents))
+
+		profile, err := parseIgnoreProfilesFromReader(r, coverProfile)
+		if err != nil {
+			t.Errorf("should not error, but %s", err)
+		}
+		if profile.Type != BLOCK_IGNORE {
+			t.Errorf("type should %s, but %s", BLOCK_IGNORE, profile.Type)
+		}
+		// results should have 5 ignore blocks
+		if len(profile.IgnoreBlocks) != 5 {
+			t.Errorf("should have 5 ignore blocks, but get %d", len(profile.IgnoreBlocks))
 		}
 	})
 }

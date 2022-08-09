@@ -124,19 +124,18 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 		return patternLineNumber + 1
 	}
 
-	ignoreBlock := &IgnoreBlock{Annotation: patternText}
-
-	// Record the ignore code profile contents
-	for i := profileBlock.StartLine; i <= profileBlock.EndLine; i++ {
-		// as the source file of the scanner is same with cover profile,
-		// so this method call always true.
-		ignoreBlock.Lines = append(ignoreBlock.Lines, i)
-		ignoreBlock.Contents = append(ignoreBlock.Contents, fileLines[i-1])
-	}
-
 	if _, ok := profile.IgnoreBlocks[*profileBlock]; !ok {
+		ignoreBlock := &IgnoreBlock{Annotation: patternText}
+
+		// Record the ignore code profile contents
+		for i := profileBlock.StartLine; i <= profileBlock.EndLine; i++ {
+			// as the source file of the scanner is same with cover profile,
+			// so this method call always true.
+			ignoreBlock.Lines = append(ignoreBlock.Lines, i)
+			ignoreBlock.Contents = append(ignoreBlock.Contents, fileLines[i-1])
+		}
 		profile.IgnoreBlocks[*profileBlock] = ignoreBlock
 	}
 
-	return profileBlock.EndLine
+	return profileBlock.EndLine - 1
 }
