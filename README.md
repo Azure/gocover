@@ -109,17 +109,17 @@ func case3(x int) {//+gocover:ignore:block       -|
 }
 
 func case4(func() int) {
-	{ //+gocover:ignore:block                    -|
-		fmt.Printf("A")                        // |
-		fmt.Printf("A")                        // | -> Lines ignored
-		fmt.Printf("A")                        // |
-	}                                          //-|
+	{ //+gocover:ignore:block                -|
+		fmt.Printf("A")                // |
+		fmt.Printf("A")                // | -> Lines ignored
+		fmt.Printf("A")                // |
+	}                                      //-|
 	fmt.Printf("A")
 }
 
 func case5(x int) {                            //-|
-	//+gocover:ignore:block                       | 
-	case6(func() int {                         //-| -> Lines ignored
+	//+gocover:ignore:block                   | 
+	case6(func() int {                     //-| -> Lines ignored
 		return 1
 	})
 }
