@@ -42,6 +42,8 @@ var _ ReportGenerator = (*htmlReportGenerator)(nil)
 const (
 	// CodeLanguage represents the language style for report.
 	CodeLanguage = "go"
+	// codeHighlightColor background color for those uncovered code lines.
+	codeHighlightColor = "bg:#ffcccc"
 )
 
 // NewReportGenerator creates a html report generator to generate html coverage report.
@@ -57,6 +59,11 @@ func NewReportGenerator(
 	style := styles.Get(codeStyle)
 	if style == nil {
 		style = styles.Fallback
+	}
+
+	builder := style.Builder().Add(chroma.LineHighlight, codeHighlightColor)
+	if s, err := builder.Build(); err == nil {
+		style = s
 	}
 
 	lexer := lexers.Get(CodeLanguage)
