@@ -4,13 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/Azure/gocover/pkg/dbclient"
-	"github.com/Azure/gocover/pkg/gittool"
+	"github.com/Azure/gocover/pkg/gtest"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/spf13/cobra"
 	"golang.org/x/tools/cover"
@@ -223,53 +220,20 @@ func newTestCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "test",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			gitClient, err := gittool.NewGitClient(repositoryPath)
+			gocoverTest, err := gtest.NewGocoverTest(repositoryPath, compareBranch, cmd.OutOrStdout())
 			if err != nil {
-				return fmt.Errorf("git repository: %w", err)
+				return fmt.Errorf("new gocover test: %s", err)
 			}
-			changes, err := gitClient.DiffChangesFromCommitted(compareBranch)
+
+			err = gocoverTest.CheckGoTestFiles()
 			if err != nil {
-				return fmt.Errorf("git diff: %w", err)
+				return fmt.Errorf("check go test files: %s", err)
 			}
-
-			for _, c := range changes {
-				folder := filepath.Dir(filepath.Join(repositoryPath, c.FileName))
-				exist, err := checkTestFileExistence(folder)
-				if err != nil {
-					return fmt.Errorf("checkTestFileExistence: %w", err)
-				}
-				if exist {
-					continue
-				}
-
-				_, pkgName := filepath.Split(folder)
-				ioutil.WriteFile(filepath.Join(folder, fmt.Sprintf("%s_test.go", pkgName)), []byte(fmt.Sprintf("package %s", pkgName)), 0644)
-			}
-
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&repositoryPath, "repository-path", "./", `the root directory of git repository`)
-	cmd.Flags().StringVar(&compareBranch, "compare-branch", "origin/mastet", `branch to compare`)
+	cmd.Flags().StringVar(&compareBranch, "compare-branch", "origin/master", `branch to compare`)
 	return cmd
-}
-
-func checkTestFileExistence(folder string) (bool, error) {
-	files, err := ioutil.ReadDir(folder)
-	if err != nil {
-		return false, fmt.Errorf("%w", err)
-	}
-
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-
-		if strings.HasSuffix(strings.ToLower(f.Name()), "_test.go") {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
