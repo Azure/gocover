@@ -885,32 +885,3 @@ func TestFindProfileBlock(t *testing.T) {
 	})
 
 }
-
-func TestCheckTestFileExistence(t *testing.T) {
-	t.Run("no test files", func(t *testing.T) {
-		dir := t.TempDir()
-		ioutil.WriteFile(filepath.Join(dir, "foo.go"), []byte(""), 0644)
-
-		exist, err := checkTestFileExistence(dir)
-		if err != nil {
-			t.Errorf("should not err, but get: %s", err)
-		}
-		if exist == true {
-			t.Errorf("should no test files, but exist")
-		}
-	})
-
-	t.Run("has test files", func(t *testing.T) {
-		dir := t.TempDir()
-		ioutil.WriteFile(filepath.Join(dir, "foo.go"), []byte(""), 0644)
-		ioutil.WriteFile(filepath.Join(dir, "foo_test.go"), []byte(""), 0644)
-
-		exist, err := checkTestFileExistence(dir)
-		if err != nil {
-			t.Errorf("should not err, but get: %s", err)
-		}
-		if exist == false {
-			t.Errorf("should have test files, but does not")
-		}
-	})
-}

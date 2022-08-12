@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Azure/gocover/pkg/dbclient"
+	"github.com/Azure/gocover/pkg/gtest"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/spf13/cobra"
 	"golang.org/x/tools/cover"
@@ -84,6 +85,7 @@ func NewGoCoverCommand() *cobra.Command {
 
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
+	cmd.AddCommand(newTestCommand())
 	return cmd
 }
 
@@ -207,5 +209,31 @@ func newFullCoverageCommand() *cobra.Command {
 
 	cmd.MarkFlagRequired("cover-profile")
 
+	return cmd
+}
+
+func newTestCommand() *cobra.Command {
+	var (
+		repositoryPath string
+		compareBranch  string
+	)
+	cmd := &cobra.Command{
+		Use: "test",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			gocoverTest, err := gtest.NewGocoverTest(repositoryPath, compareBranch, cmd.OutOrStdout())
+			if err != nil {
+				return fmt.Errorf("new gocover test: %s", err)
+			}
+
+			err = gocoverTest.CheckGoTestFiles()
+			if err != nil {
+				return fmt.Errorf("check go test files: %s", err)
+			}
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&repositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&compareBranch, "compare-branch", "origin/master", `branch to compare`)
 	return cmd
 }

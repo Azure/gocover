@@ -3,7 +3,6 @@ package report
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -37,17 +36,6 @@ func NewDiffCoverage(
 			return nil, fmt.Errorf("compile pattern %s: %w", ignorePattern, err)
 		}
 		excludesRegexps = append(excludesRegexps, reg)
-	}
-
-	for _, c := range changes {
-		folder := filepath.Dir(filepath.Join(repositoryPath, c.FileName))
-		exist, err := checkTestFileExistence(folder)
-		if err != nil {
-			return nil, fmt.Errorf("checkTestFileExistence: %w", err)
-		}
-		if !exist {
-			return nil, fmt.Errorf("%w in %s", ErrNoTestFile, folder)
-		}
 	}
 
 	return &diffCoverage{
@@ -392,25 +380,6 @@ func findProfileBlock(blocks []cover.ProfileBlock, lineNumber int, line string) 
 		idx--
 	}
 	return nil
-}
-
-func checkTestFileExistence(folder string) (bool, error) {
-	files, err := ioutil.ReadDir(folder)
-	if err != nil {
-		return false, fmt.Errorf("%w", err)
-	}
-
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-
-		if strings.HasSuffix(strings.ToLower(f.Name()), "_test.go") {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 // findChange find the expected change by file name.
