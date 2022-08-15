@@ -11,7 +11,7 @@ import (
 	"github.com/Azure/gocover/pkg/gittool"
 )
 
-func TestCheckGoTestFiles(t *testing.T) {
+func TestEnsureGoTestFiles(t *testing.T) {
 	t.Run("diff changes failed", func(t *testing.T) {
 		dir := t.TempDir()
 		gocoverTest := &GocoverTest{
@@ -25,7 +25,7 @@ func TestCheckGoTestFiles(t *testing.T) {
 			},
 		}
 
-		err := gocoverTest.CheckGoTestFiles()
+		err := gocoverTest.EnsureGoTestFiles()
 		if err == nil {
 			t.Errorf("should fail, but get nil")
 		}
@@ -43,7 +43,8 @@ func TestCheckGoTestFiles(t *testing.T) {
 		gocoverTest := &GocoverTest{
 			RepositoryPath: dir,
 			CompareBranch:  "origin/master",
-			Writer:         &bytes.Buffer{},
+			Writer:         os.Stdout,
+			// Writer:         &bytes.Buffer{},
 			GitClient: &mockGitClient{
 				DiffChangesFromCommittedFn: func(compareBranch string) ([]*gittool.Change, error) {
 					return []*gittool.Change{
@@ -54,7 +55,7 @@ func TestCheckGoTestFiles(t *testing.T) {
 			},
 		}
 
-		err := gocoverTest.CheckGoTestFiles()
+		err := gocoverTest.EnsureGoTestFiles()
 		if err != nil {
 			t.Errorf("should no error, but get error %s", err)
 		}

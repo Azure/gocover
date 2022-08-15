@@ -42,7 +42,9 @@ func NewGocoverTest(
 	}, nil
 }
 
-func (g *GocoverTest) CheckGoTestFiles() error {
+// EnsureGoTestFiles checks the diff changes, and ensures the existence of go test file
+// if there are changes about go source files.
+func (g *GocoverTest) EnsureGoTestFiles() error {
 	changes, err := g.GitClient.DiffChangesFromCommitted(g.CompareBranch)
 	if err != nil {
 		return fmt.Errorf("git diff: %w", err)
@@ -50,6 +52,11 @@ func (g *GocoverTest) CheckGoTestFiles() error {
 
 	handled := make(map[string]bool)
 	for _, c := range changes {
+		// in case of other files, except go files
+		if !strings.HasSuffix(c.FileName, ".go") {
+			continue
+		}
+
 		f := filepath.Join(g.RepositoryPath, c.FileName)
 
 		folder := filepath.Dir(f)
