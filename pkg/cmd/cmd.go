@@ -225,7 +225,7 @@ func newTestCommand() *cobra.Command {
 				return fmt.Errorf("new gocover test: %s", err)
 			}
 
-			err = gocoverTest.CheckGoTestFiles()
+			err = gocoverTest.EnsureGoTestFiles()
 			if err != nil {
 				return fmt.Errorf("check go test files: %s", err)
 			}
