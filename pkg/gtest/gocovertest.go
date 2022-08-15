@@ -50,6 +50,11 @@ func (g *GocoverTest) CheckGoTestFiles() error {
 
 	handled := make(map[string]bool)
 	for _, c := range changes {
+		// in case of other files, except go files
+		if strings.HasSuffix(c.FileName, ".go") {
+			continue
+		}
+
 		f := filepath.Join(g.RepositoryPath, c.FileName)
 
 		folder := filepath.Dir(f)
