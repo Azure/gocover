@@ -16,6 +16,7 @@ func TestIgnoreRegexp(t *testing.T) {
 			input  string
 			expect []string
 		}{
+			{input: "//+gocover:ignore:file:don't want test this block", expect: []string{"//+gocover:ignore:file:don't want test this block", "file", "don't want test this block"}},
 			{input: "//+gocover:ignore:file:some comments", expect: []string{"//+gocover:ignore:file:some comments", "file", "some comments"}},
 			{input: "    //+gocover:ignore:file:some comments", expect: []string{"    //+gocover:ignore:file:some comments", "file", "some comments"}},
 			{input: "	//+gocover:ignore:file:some comments", expect: []string{"	//+gocover:ignore:file:some comments", "file", "some comments"}},
