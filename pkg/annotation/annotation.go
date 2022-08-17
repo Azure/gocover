@@ -16,8 +16,9 @@ var (
 	// - file
 	//
 	// This regexp matches the lines that
-	// starts with any characters, then follows `//`, and `+gocover:ignore:` then following either `file` or `block`.
-	IgnoreRegexp = regexp.MustCompile(`.*//\+gocover:ignore:(file|block)`)
+	// starts with any characters, then follows `//+gocover:ignore:` and following either `file` or `block`,
+	// then comments about the intention. Comments should not start with whitespace character.
+	IgnoreRegexp = regexp.MustCompile(`.*//\+gocover:ignore:(file|block):(\S+.*)`)
 )
 
 // IgnoreType indicates the type of the ignore profile.
@@ -95,7 +96,7 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 			// as index of fileLines starts from 0, the endline is actually the next index that waiting handling.
 			i = ignoreOnBlock(fileLines, profile, coverProfile, i+1, fileLines[i])
 		} else {
-			//+gocover:ignore:block
+			//+gocover:ignore:block:won't reach here
 			i++
 		}
 	}

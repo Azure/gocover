@@ -16,14 +16,17 @@ func TestIgnoreRegexp(t *testing.T) {
 			input  string
 			expect []string
 		}{
-			{input: "//+gocover:ignore:file", expect: []string{"//+gocover:ignore:file", "file"}},
-			{input: "    //+gocover:ignore:file", expect: []string{"    //+gocover:ignore:file", "file"}},
-			{input: "	//+gocover:ignore:file", expect: []string{"	//+gocover:ignore:file", "file"}},
-			{input: "//+gocover:ignore:block", expect: []string{"//+gocover:ignore:block", "block"}},
-			{input: "    //+gocover:ignore:block", expect: []string{"    //+gocover:ignore:block", "block"}},
-			{input: "	//+gocover:ignore:block", expect: []string{"	//+gocover:ignore:block", "block"}},
-			{input: "  {  //+gocover:ignore:block", expect: []string{"  {  //+gocover:ignore:block", "block"}},
-			{input: "  //  //+gocover:ignore:block", expect: []string{"  //  //+gocover:ignore:block", "block"}},
+			{input: "//+gocover:ignore:file:some comments", expect: []string{"//+gocover:ignore:file:some comments", "file", "some comments"}},
+			{input: "    //+gocover:ignore:file:some comments", expect: []string{"    //+gocover:ignore:file:some comments", "file", "some comments"}},
+			{input: "	//+gocover:ignore:file:some comments", expect: []string{"	//+gocover:ignore:file:some comments", "file", "some comments"}},
+			{input: "//+gocover:ignore:block:some comments", expect: []string{"//+gocover:ignore:block:some comments", "block", "some comments"}},
+			{input: "    //+gocover:ignore:block:some comments", expect: []string{"    //+gocover:ignore:block:some comments", "block", "some comments"}},
+			{input: "	//+gocover:ignore:block:some comments", expect: []string{"	//+gocover:ignore:block:some comments", "block", "some comments"}},
+			{input: "  {  //+gocover:ignore:block:some comments", expect: []string{"  {  //+gocover:ignore:block:some comments", "block", "some comments"}},
+			{input: "  //  //+gocover:ignore:block:some comments", expect: []string{"  //  //+gocover:ignore:block:some comments", "block", "some comments"}},
+			{input: "//+gocover:ignore:file: ", expect: nil},
+			{input: "//+gocover:ignore:file: comments", expect: nil},
+			{input: "//+gocover:ignore:block", expect: nil},
 			{input: "// +gocover:ignore:block", expect: nil},
 			{input: "// +gocover:ignore:file", expect: nil},
 			{input: "//+gocover:ignore:abc", expect: nil},
@@ -59,16 +62,16 @@ func TestParseIgnoreProfiles(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "foo.go")
 		fileContents := `
-		//+gocover:ignore:file
+		//+gocover:ignore:file:don't want test this file
 		{
-			//+gocover:ignore:block
+			//+gocover:ignore:block:won't reach here
 			a := "Hello world"
 			fmt.Println(a)
 		}
 	
-		//+gocover:ignore:block
+		//+gocover:ignore:block:won't reach here
 	
-		if err != nil { //+gocover:ignore:block
+		if err != nil { //+gocover:ignore:block:won't reach here
 			return err
 		}
 	`
@@ -93,14 +96,14 @@ func TestParseIgnoreProfiles(t *testing.T) {
 		f := filepath.Join(dir, "foo.go")
 		fileContents := `
 		{
-			//+gocover:ignore:block
+			//+gocover:ignore:block:won't reach here
 			a := "Hello world"
 			fmt.Println(a)
 		}
 	
-		//+gocover:ignore:block
+		//+gocover:ignore:block:won't reach here
 	
-		if err != nil { //+gocover:ignore:block
+		if err != nil { //+gocover:ignore:block:won't reach here
 			return err
 		}
 	`
@@ -163,16 +166,16 @@ func TestParseIgnoreProfilesFromReader(t *testing.T) {
 
 	t.Run("ignore file", func(t *testing.T) {
 		fileContents := `
-		//+gocover:ignore:file
+		//+gocover:ignore:file:don't want test this file
 		{
-			//+gocover:ignore:block
+			//+gocover:ignore:block:won't reach here
 			a := "Hello world"
 			fmt.Println(a)
 		}
 	
-		//+gocover:ignore:block
+		//+gocover:ignore:block:won't reach here
 	
-		if err != nil { //+gocover:ignore:block
+		if err != nil { //+gocover:ignore:block:won't reach here
 			return err
 		}
 	`
@@ -190,14 +193,14 @@ func TestParseIgnoreProfilesFromReader(t *testing.T) {
 	t.Run("ignore block", func(t *testing.T) {
 		fileContents := `
 		{
-			//+gocover:ignore:block
+			//+gocover:ignore:block:won't reach here
 			a := "Hello world"
 			fmt.Println(a)
 		}
 	
-		//+gocover:ignore:block
+		//+gocover:ignore:block:won't reach here
 	
-		if err != nil { //+gocover:ignore:block
+		if err != nil { //+gocover:ignore:block:won't reach here
 			return err
 		}
 	`
@@ -258,7 +261,7 @@ func TestParseIgnoreProfilesFromReader(t *testing.T) {
 			fmt.Println(a)
 		}
 	
-		//+gocover:ignore:block
+		//+gocover:ignore:block:won't reach here
 	
 		if err != nil {
 			return err
@@ -291,14 +294,14 @@ func TestParseIgnoreProfilesFromReader(t *testing.T) {
 func TestIgnoreOnblock(t *testing.T) {
 	fileContents := `
 	{
-		//+gocover:ignore:block
+		//+gocover:ignore:block:won't reach here
 		a := "Hello world"
 		fmt.Println(a)
 	}
 
-	//+gocover:ignore:block
+	//+gocover:ignore:block:won't reach here
 
-	if err != nil { //+gocover:ignore:block
+	if err != nil { //+gocover:ignore:block:won't reach here
 		return err
 	}
 `
@@ -364,12 +367,12 @@ import "fmt"
 
 var i, j int = 3, 3
 
-func case1() { //+gocover:ignore:block
+func case1() { //+gocover:ignore:block:won't reach here
 	var c, python, java = true, false, "no!"
 	fmt.Println(i, j, c, python, java)
 }
 
-func case2(x int) { //+gocover:ignore:block
+func case2(x int) { //+gocover:ignore:block:won't reach here
 	var c, python, java = true, false, "yes!"
 	if x > 0 {
 		fmt.Println(i, j, c, python, java)
@@ -377,9 +380,9 @@ func case2(x int) { //+gocover:ignore:block
 	fmt.Println(i, j, c, python, java, x)
 }
 
-func case3(x int) { //+gocover:ignore:block
+func case3(x int) { //+gocover:ignore:block:won't reach here
 	var c, python, java = true, false, "yes!"
-	if x > 0 { //+gocover:ignore:block
+	if x > 0 { //+gocover:ignore:block:won't reach here
 		fmt.Println(i, j, c, python, java)
 	}
 	fmt.Println(i, j, c, python, java, x)
@@ -387,7 +390,7 @@ func case3(x int) { //+gocover:ignore:block
 
 func case4(x int) {
 	var c, python, java = true, false, "yes!"
-	if x > 0 { //+gocover:ignore:block
+	if x > 0 { //+gocover:ignore:block:won't reach here
 		fmt.Println(i, j, c, python, java)
 	}
 	fmt.Println(i, j, c, python, java, x)
@@ -413,12 +416,12 @@ import "fmt"
 
 var i, j int = 3, 3
 
-func case1() { //+gocover:ignore:block
+func case1() { //+gocover:ignore:block:won't reach here
 	var c, python, java = true, false, "no!"
 	fmt.Println(i, j, c, python, java)
 }
 
-func case2(x int) { //+gocover:ignore:block
+func case2(x int) { //+gocover:ignore:block:won't reach here
 	var c, python, java = true, false, "yes!"
 	if x > 0 {
 		fmt.Println(i, j, c, python, java)
@@ -426,9 +429,9 @@ func case2(x int) { //+gocover:ignore:block
 	fmt.Println(i, j, c, python, java, x)
 }
 
-func case3(x int) { //+gocover:ignore:block
+func case3(x int) { //+gocover:ignore:block:won't reach here
 	var c, python, java = true, false, "yes!"
-	if x > 0 { //+gocover:ignore:block
+	if x > 0 { //+gocover:ignore:block:won't reach here
 		fmt.Println(i, j, c, python, java)
 	}
 	fmt.Println(i, j, c, python, java, x)
@@ -436,7 +439,7 @@ func case3(x int) { //+gocover:ignore:block
 
 func case4(x int) {
 	var c, python, java = true, false, "yes!"
-	if x > 0 { //+gocover:ignore:block
+	if x > 0 { //+gocover:ignore:block:won't reach here
 		fmt.Println(i, j, c, python, java)
 	}
 	fmt.Println(i, j, c, python, java, x)
