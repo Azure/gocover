@@ -2,9 +2,12 @@ package annotation
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"regexp"
+	"strings"
 
 	"golang.org/x/tools/cover"
 )
@@ -16,8 +19,11 @@ var (
 	// - file
 	//
 	// This regexp matches the lines that
-	// starts with any characters, then follows `//`, and `+gocover:ignore:` then following either `file` or `block`.
-	IgnoreRegexp = regexp.MustCompile(`.*//\+gocover:ignore:(file|block)`)
+	// starts with any characters, then follows `//+gocover:ignore:` and following either `file` or `block`,
+	// then comments about the intention. Comments should not start with whitespace character.
+	IgnoreRegexp = regexp.MustCompile(`.*//\+gocover:ignore:(file|block) (.*)`)
+
+	ErrCommentsRequired = errors.New("comments required")
 )
 
 // IgnoreType indicates the type of the ignore profile.
@@ -37,6 +43,7 @@ type IgnoreProfile struct {
 	Type         IgnoreType
 	Filename     string
 	IgnoreBlocks map[cover.ProfileBlock]*IgnoreBlock
+	Comments     string // comments about file ignore
 }
 
 // IgnoreBlock represents a single block of ignore profiling data.
@@ -44,6 +51,7 @@ type IgnoreBlock struct {
 	Annotation string   // concrete ignore pattern
 	Contents   []string // ignore contents
 	Lines      []int    // corresponding code line number of the ignore contents
+	Comments   string   // comments about block ignore
 }
 
 // ParseIgnoreProfiles parses ignore profile data in the specified file with the help of go unit test cover profile,
@@ -77,25 +85,28 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 	totalLines := len(fileLines)
 	i := 0
 	for i < totalLines {
-		match := IgnoreRegexp.FindStringSubmatch(fileLines[i])
+		ignoreKind, comments, err := parseIgnoreAnnotation(fileLines[i])
+		if err != nil {
+			return nil, err
+		}
+
 		// not match, continue next line
-		if match == nil {
+		if ignoreKind == "" {
 			i++
 			continue
 		}
 
-		// match contains the result of the regexp on IgnoreRegexp
-		ignoreKind := match[1]
 		if ignoreKind == "file" { // set type to FILE_IGNORE and skip further processing
 			profile.Type = FILE_IGNORE
+			profile.Comments = comments
 			profile.IgnoreBlocks = nil
 			break
 		} else if ignoreKind == "block" { // block
 			// ignoreOnBlock returns the endline of cover profile block
 			// as index of fileLines starts from 0, the endline is actually the next index that waiting handling.
-			i = ignoreOnBlock(fileLines, profile, coverProfile, i+1, fileLines[i])
+			i = ignoreOnBlock(fileLines, profile, coverProfile, i+1, fileLines[i], comments)
 		} else {
-			//+gocover:ignore:block
+			//+gocover:ignore:block won't reach here
 			i++
 		}
 	}
@@ -105,7 +116,7 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 
 // ignoreOnBlock finds the cover profile block that contains the ignore pattern text
 // and returns the line number of the end line of cover profile block
-func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string) int {
+func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string, comments string) int {
 	var profileBlock *cover.ProfileBlock
 
 	// gocover ignore patterns are placed in block like following,
@@ -125,7 +136,7 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 	}
 
 	if _, ok := profile.IgnoreBlocks[*profileBlock]; !ok {
-		ignoreBlock := &IgnoreBlock{Annotation: patternText}
+		ignoreBlock := &IgnoreBlock{Annotation: patternText, Comments: comments}
 
 		// Record the ignore code profile contents
 		for i := profileBlock.StartLine; i <= profileBlock.EndLine; i++ {
@@ -138,4 +149,22 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 	}
 
 	return profileBlock.EndLine - 1
+}
+
+func parseIgnoreAnnotation(line string) (string, string, error) {
+	match := IgnoreRegexp.FindStringSubmatch(line)
+	// not match, continue next line
+	if match == nil {
+		return "", "", nil
+	}
+
+	kind := match[1]
+	comments := match[2]
+
+	trimmedComments := strings.TrimSpace(comments)
+	if trimmedComments == "" {
+		return "", "", fmt.Errorf("%w for annotation '%s'", ErrCommentsRequired, line)
+	}
+
+	return kind, trimmedComments, nil
 }

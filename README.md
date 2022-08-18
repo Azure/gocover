@@ -59,14 +59,14 @@ gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}cover
 
 ### Set Ignore Annotations
 
-Use `//+gocover:ignore:file` or `//+gocover:ignore:block` as annotation, do not add any space among words.
+Use `//+gocover:ignore:file comments` or `//+gocover:ignore:block comments` as annotation, do not add any space among words, and adding non-empty comments. Note that comments does not support multiple lines.
 
 #### Ignore files
 
-Put `//+gocover:ignore:file` at any line in a file to ignore a file at coverage inspection. Note that `//+gocover:ignore:file` has the highest priority, it will overrides other ignoring annotation.
+Put `//+gocover:ignore:file comments` at any line in a file to ignore a file at coverage inspection. Note that `//+gocover:ignore:file comments` has the highest priority, it will overrides other ignoring annotation.
 
 ```go
-//+gocover:ignore:file
+//+gocover:ignore:file ignore this file!
 package foo
 func foo() {}
 ```
@@ -85,41 +85,41 @@ import "fmt"
 
 var i, j int = 1, 2
 
-func case1() { //+gocover:ignore:block           -|
- var c, python, java = true, false, "no!"      // | -> Lines ignored
- fmt.Println(i, j, c, python, java)            //-|
+func case1() { //+gocover:ignore:block ignore this block  -|
+ var c, python, java = true, false, "no!"               // | -> Lines ignored
+ fmt.Println(i, j, c, python, java)                     //-|
 }
 
-func case2(x int) {//+gocover:ignore:block       -|
- var c, python, java = true, false, "no!"      // | -> Lines ignored
- if x > 0 {                                    //-|
+func case2(x int) {//+gocover:ignore:block ignore this block  -|
+ var c, python, java = true, false, "no!"                   // | -> Lines ignored
+ if x > 0 {                                                 //-|
   fmt.Println(i, j, c, python, java)
  }
 
  fmt.Println(i, j, c, python, java, x)
 }
 
-func case3(x int) {//+gocover:ignore:block       -|
- var c, python, java = true, false, "no!"      // | -> Lines ingored - Block1
- if x > 0 { //+gocover:ignore:block              -|
-  fmt.Println(i, j, c, python, java)           // | -> Lines ingored - Block2
- }                                             //-|
+func case3(x int) {//+gocover:ignore:block ignore this block -|
+ var c, python, java = true, false, "no!"                  // | -> Lines ingored - Block1
+ if x > 0 { //+gocover:ignore:block ignore this block        -|
+  fmt.Println(i, j, c, python, java)                       // | -> Lines ingored - Block2
+ }                                                         //-|
 
  fmt.Println(i, j, c, python, java, x)
 }
 
 func case4(func() int) {
-	{ //+gocover:ignore:block                -|
-		fmt.Printf("A")                // |
-		fmt.Printf("A")                // | -> Lines ignored
-		fmt.Printf("A")                // |
-	}                                      //-|
+	{ //+gocover:ignore:block ignore this block      -|
+		fmt.Printf("A")                        // |
+		fmt.Printf("A")                        // | -> Lines ignored
+		fmt.Printf("A")                        // |
+	}                                              //-|
 	fmt.Printf("A")
 }
 
-func case5(x int) {                            //-|
-	//+gocover:ignore:block                   | 
-	case6(func() int {                     //-| -> Lines ignored
+func case5(x int) {                                //-|
+	//+gocover:ignore:block ignore this block     | 
+	case6(func() int {                         //-| -> Lines ignored
 		return 1
 	})
 }
