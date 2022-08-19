@@ -83,6 +83,7 @@ func (diff *diffCoverage) ignore() {
 		for _, reg := range diff.excludesRegexps {
 			if reg.MatchString(p.FileName) {
 				filter = true
+				fmt.Printf("ignore file: %s\n", p.FileName)
 				break
 			}
 		}

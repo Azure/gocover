@@ -36,6 +36,7 @@ func TestEnsureGoTestFiles(t *testing.T) {
 		os.Mkdir(filepath.Join(dir, "foo"), 0777)
 		ioutil.WriteFile(filepath.Join(dir, "foo/foo.go"), []byte("package foo"), 0644)
 		ioutil.WriteFile(filepath.Join(dir, "foo/foo_test.go"), []byte("package foo"), 0644)
+		ioutil.WriteFile(filepath.Join(dir, "mock_foo/foo.go"), []byte("package mock_foo"), 0644)
 
 		os.Mkdir(filepath.Join(dir, "bar"), 0777)
 		ioutil.WriteFile(filepath.Join(dir, "bar/bar.go"), []byte("package zoo"), 0644)
@@ -43,8 +44,7 @@ func TestEnsureGoTestFiles(t *testing.T) {
 		gocoverTest := &GocoverTest{
 			RepositoryPath: dir,
 			CompareBranch:  "origin/master",
-			Writer:         os.Stdout,
-			// Writer:         &bytes.Buffer{},
+			Writer:         &bytes.Buffer{},
 			GitClient: &mockGitClient{
 				DiffChangesFromCommittedFn: func(compareBranch string) ([]*gittool.Change, error) {
 					return []*gittool.Change{
@@ -212,6 +212,25 @@ func TestPackageRegexp(t *testing.T) {
 				if match[i] != testCase.expect[i] {
 					t.Errorf("expect item %d %s, but %s", i, testCase.expect[i], match[i])
 				}
+			}
+		}
+	})
+}
+
+func TestMockFileRegexp(t *testing.T) {
+	t.Run("validate mockFileRegexp", func(t *testing.T) {
+		testSuite := []struct {
+			input  string
+			expect bool
+		}{
+			{input: "/mock_foo/foo.go", expect: true},
+			{input: "/s/mock_interface/foo/foo.go", expect: true},
+		}
+
+		for _, testCase := range testSuite {
+			match := goMockFileRegexp.MatchString(testCase.input)
+			if match != testCase.expect {
+				t.Errorf("expect %t, but get %t for input %s", testCase.expect, match, testCase.input)
 			}
 		}
 	})
