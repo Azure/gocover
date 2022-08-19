@@ -42,6 +42,8 @@ func NewGocoverTest(
 	}, nil
 }
 
+var goMockFileRegexp = regexp.MustCompile(`.*mock_.*`)
+
 // EnsureGoTestFiles checks the diff changes, and ensures the existence of go test file
 // if there are changes about go source files.
 func (g *GocoverTest) EnsureGoTestFiles() error {
@@ -54,6 +56,11 @@ func (g *GocoverTest) EnsureGoTestFiles() error {
 	for _, c := range changes {
 		// in case of other files, except go files
 		if !strings.HasSuffix(c.FileName, ".go") {
+			continue
+		}
+
+		// don't generate test file for go mock files
+		if goMockFileRegexp.MatchString(c.FileName) {
 			continue
 		}
 
