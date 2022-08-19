@@ -225,7 +225,7 @@ func TestBuildChangeFromPatch(t *testing.T) {
 		equalChunk := &mockChunk{
 			ContentFn: func() string {
 				return `line1
-line2`
+	line2`
 			},
 			TypeFn: func() diff.Operation {
 				return diff.Equal
@@ -234,7 +234,7 @@ line2`
 		addChunk := &mockChunk{
 			ContentFn: func() string {
 				return `line3
-line4`
+	line4`
 			},
 			TypeFn: func() diff.Operation {
 				return diff.Add
@@ -243,14 +243,14 @@ line4`
 		deleteChunk := &mockChunk{
 			ContentFn: func() string {
 				return `line5
-line6`
+	line6`
 			},
 			TypeFn: func() diff.Operation {
 				return diff.Delete
 			},
 		}
 
-		filename := "foo"
+		filename := "foo.go"
 		g := &gitClient{repositoryPath: path}
 
 		change, err := g.buildChangeFromPatch(&mockFilePatch{
@@ -259,9 +259,15 @@ line6`
 						PathFn: func() string {
 							return filename
 						},
+						ModeFn: func() filemode.FileMode {
+							return filemode.Regular
+						},
 					}, &mockFile{
 						PathFn: func() string {
 							return filename
+						},
+						ModeFn: func() filemode.FileMode {
+							return filemode.Regular
 						},
 					}
 			},
@@ -288,11 +294,11 @@ line6`
 		path, clean := temporalDir()
 		defer clean()
 
-		filename := "foo"
+		filename := "foo.go"
 		texts := `foo
-bar
-hello world
-`
+	bar
+	hello world
+	`
 		f := filepath.Join(path, filename)
 		err := ioutil.WriteFile(f, []byte(texts), 0644)
 		checkError(err)
@@ -304,6 +310,9 @@ hello world
 				return nil, &mockFile{
 					PathFn: func() string {
 						return filename
+					},
+					ModeFn: func() filemode.FileMode {
+						return filemode.Regular
 					},
 				}
 			},
@@ -362,6 +371,43 @@ func TestDiffChangesFromCommitted(t *testing.T) {
 		_, err := g.DiffChangesFromCommitted("foo")
 		if err != nil {
 			t.Errorf("should not return error, but get: %s", err)
+		}
+	})
+}
+
+func TestIsGoFile(t *testing.T) {
+	t.Run("isGoFile", func(t *testing.T) {
+		if result := isGoFile(&mockFile{
+			ModeFn: func() filemode.FileMode {
+				return filemode.Regular
+			},
+			PathFn: func() string {
+				return "pkg/foo.go"
+			},
+		}); result != true {
+			t.Errorf("should true but return %t", result)
+		}
+
+		if result := isGoFile(&mockFile{
+			ModeFn: func() filemode.FileMode {
+				return filemode.Regular
+			},
+			PathFn: func() string {
+				return "pkg/config.yaml"
+			},
+		}); result != false {
+			t.Errorf("should false but return %t", result)
+		}
+
+		if result := isGoFile(&mockFile{
+			ModeFn: func() filemode.FileMode {
+				return filemode.Symlink
+			},
+			PathFn: func() string {
+				return "superlink"
+			},
+		}); result != false {
+			t.Errorf("should false but return %t", result)
 		}
 	})
 }
