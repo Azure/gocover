@@ -10,6 +10,7 @@ import (
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/format/diff"
 	gogitobj "github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -125,7 +126,9 @@ func (g *gitClient) buildChangeFromPatch(filePatch diff.FilePatch) (*Change, err
 
 	// new file
 	case from == nil:
-		return g.buildChangeFromFile(to.Path())
+		if to.Mode() == filemode.Regular {
+			return g.buildChangeFromFile(to.Path())
+		}
 
 	// delete file
 	case to == nil:
