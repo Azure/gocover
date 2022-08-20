@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/format/diff"
 	gogitobj "github.com/go-git/go-git/v5/plumbing/object"
 )
@@ -121,11 +123,15 @@ func (g *gitClient) buildChangeFromPatch(filePatch diff.FilePatch) (*Change, err
 	switch {
 	// modify or rename file
 	case from != nil && to != nil:
-		return g.buildChangeFromChunks(to.Path(), filePatch.Chunks())
+		if isGoFile(to) {
+			return g.buildChangeFromChunks(to.Path(), filePatch.Chunks())
+		}
 
 	// new file
 	case from == nil:
-		return g.buildChangeFromFile(to.Path())
+		if isGoFile(to) {
+			return g.buildChangeFromFile(to.Path())
+		}
 
 	// delete file
 	case to == nil:
@@ -134,6 +140,11 @@ func (g *gitClient) buildChangeFromPatch(filePatch diff.FilePatch) (*Change, err
 
 	return nil, nil
 
+}
+
+func isGoFile(fileInfo diff.File) bool {
+	return fileInfo.Mode() == filemode.Regular &&
+		strings.HasSuffix(fileInfo.Path(), ".go")
 }
 
 // buildChangeFromChunks builds the diff change from git chunks.
