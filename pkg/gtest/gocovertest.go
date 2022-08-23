@@ -129,7 +129,10 @@ func checkTestFileExistence(folder string) (bool, error) {
 
 var (
 	ErrPackageNameNotFound = errors.New("package not found")
-	packageRegexp          = regexp.MustCompile(`^package\s+([a-zA-Z][a-zA-Z0-9]*)`) // regexp for matching "package xxx"
+
+	// The rule of package name:
+	// https://go.dev/ref/spec#Package_clause
+	packageRegexp = regexp.MustCompile(`^package\s+(\S+)`) // regexp for matching "package xxx"
 )
 
 func parsePackageName(filename string) (string, error) {
@@ -146,7 +149,7 @@ func parsePackageName(filename string) (string, error) {
 			continue
 		}
 
-		return match[1], nil
+		return strings.TrimSpace(match[1]), nil
 	}
 
 	return "", ErrPackageNameNotFound
