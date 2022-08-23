@@ -197,8 +197,11 @@ func TestPackageRegexp(t *testing.T) {
 			{input: "package foo", expect: []string{"package foo", "foo"}},
 			{input: "package  foo", expect: []string{"package  foo", "foo"}},
 			{input: "package foo1", expect: []string{"package foo1", "foo1"}},
+			{input: "package _foo1", expect: []string{"package _foo1", "_foo1"}},
+			{input: "package foo_1", expect: []string{"package foo_1", "foo_1"}},
 			{input: "package Foo1", expect: []string{"package Foo1", "Foo1"}},
-			{input: "package 1foo1", expect: nil},
+			{input: "package αβ", expect: []string{"package αβ", "αβ"}},
+			{input: "package ThisVariableIsExported", expect: []string{"package ThisVariableIsExported", "ThisVariableIsExported"}},
 			{input: " package foo", expect: nil},
 		}
 
