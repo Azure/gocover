@@ -7,6 +7,7 @@ require (
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/alecthomas/chroma/v2 v2.0.0-alpha4
 	github.com/go-git/go-git/v5 v5.4.2
+	github.com/sirupsen/logrus v1.4.1
 	github.com/spf13/cobra v1.4.0
 	golang.org/x/tools v0.1.10
 )
@@ -41,6 +42,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v0.0.0-20201106050909-4977a11b4351 // indirect
+	github.com/konsorten/go-windows-terminal-sequences v1.0.1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
