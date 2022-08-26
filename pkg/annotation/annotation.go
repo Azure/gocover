@@ -20,8 +20,8 @@ var (
 	//
 	// This regexp matches the lines that
 	// starts with any characters, then follows `//+gocover:ignore:` and following either `file` or `block`,
-	// then comments about the intention. Comments should not start with whitespace character.
-	IgnoreRegexp = regexp.MustCompile(`.*//\+gocover:ignore:(file|block) (.*)`)
+	// then comments about the intention.
+	IgnoreRegexp = regexp.MustCompile(`.*//\s*\+gocover:ignore:(file|block) (.*)`)
 
 	ErrCommentsRequired = errors.New("comments required")
 )
@@ -121,8 +121,8 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 
 	// gocover ignore patterns are placed in block like following,
 	// so the line number of it >= start line of code block and <= end line of code block
-	// {  //+gocover:ignore:xxx
-	//    //+gocover:ignore:xxx
+	// {  //+gocover:ignore:xxx comments
+	//    //+gocover:ignore:xxx comments
 	// }
 	for _, b := range coverProfile.Blocks {
 		if b.StartLine <= patternLineNumber && patternLineNumber < b.EndLine {

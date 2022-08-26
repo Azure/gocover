@@ -38,10 +38,10 @@ type TreeNode struct {
 	isLeaf              bool                 // whether the node is leaf or internal node
 }
 
-func NewCoverageTree(hostpath string) CoverageTree {
+func NewCoverageTree(modulePath string) CoverageTree {
 	return &coverageTree{
-		ModuleHostPath: hostpath,
-		Root:           NewTreeNode(hostpath, false),
+		ModuleHostPath: modulePath,
+		Root:           NewTreeNode(modulePath, false),
 	}
 }
 
@@ -142,6 +142,10 @@ func (p *coverageTree) FindOrCreate(file string) *TreeNode {
 			currentNode.Nodes[name] = newNode
 			currentNode = newNode
 		}
+	}
+
+	if leaf, ok := currentNode.Nodes[f]; ok {
+		return leaf
 	}
 
 	leaf := NewTreeNode(f, true)

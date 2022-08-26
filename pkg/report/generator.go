@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,17 +13,16 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/sirupsen/logrus"
 )
 
 // ReportGenerator represents the feature that generate coverage report.
 type ReportGenerator interface {
-	GenerateReport() error
+	GenerateReport(statistics *Statistics) error
 }
 
 // htmlReportGenerator implements a html style report generator.
 type htmlReportGenerator struct {
-	// final diff coverage profile statistics
-	statistics *Statistics
 	// lexer for parsing go code
 	lexer chroma.Lexer
 	// style for go code snippets
@@ -33,8 +31,8 @@ type htmlReportGenerator struct {
 	outputPath string
 	// reportName report name
 	reportName string
-	// io writer
-	writer io.Writer
+	// logger
+	logger logrus.FieldLogger
 }
 
 var _ ReportGenerator = (*htmlReportGenerator)(nil)
@@ -50,11 +48,10 @@ const (
 // We will use https://pygments.org/docs/styles to style the output,
 // and use // https://github.com/alecthomas/chroma to help to generate code snippets.
 func NewReportGenerator(
-	statistics *Statistics,
 	codeStyle string,
 	outputPath string,
 	reportName string,
-	writer io.Writer,
+	logger logrus.FieldLogger,
 ) ReportGenerator {
 	style := styles.Get(codeStyle)
 	if style == nil {
@@ -73,18 +70,17 @@ func NewReportGenerator(
 
 	return &htmlReportGenerator{
 		lexer:      lexer,
-		statistics: statistics,
 		style:      style,
 		outputPath: outputPath,
 		reportName: reportName,
-		writer:     writer,
+		logger:     logger,
 	}
 }
 
 // GenerateReport process the diff coverage profile statistics and generate the final html report.
-func (g *htmlReportGenerator) GenerateReport() error {
+func (g *htmlReportGenerator) GenerateReport(statistics *Statistics) error {
 
-	err := g.processCodeSnippets()
+	err := g.processCodeSnippets(statistics)
 	if err != nil {
 		return fmt.Errorf("process code snippets: %w", err)
 	}
@@ -95,21 +91,21 @@ func (g *htmlReportGenerator) GenerateReport() error {
 		return fmt.Errorf("create report file: %w", err)
 	}
 
-	err = htmlCoverageReportTemplate.Execute(f, g.statistics)
+	err = htmlCoverageReportTemplate.Execute(f, statistics)
 	if err != nil {
 		return fmt.Errorf("write report: %w", err)
 	}
 
-	fmt.Fprintf(g.writer, "Write report to %s \n", reportFile)
+	g.logger.Debugf("generate html report to %s", reportFile)
 	return nil
 }
 
 // processCodeSnippets process the violation sections and generate the corresponding go code snippets
 // which shows the concrete code lines that violates the test coverage.
-func (g *htmlReportGenerator) processCodeSnippets() error {
+func (g *htmlReportGenerator) processCodeSnippets(statistics *Statistics) error {
 
 	// each file has a coverage profile, and each coverage profile may have zero to many violation sections.
-	for _, profile := range g.statistics.CoverageProfile {
+	for _, profile := range statistics.CoverageProfile {
 		if profile.CoveredLines == profile.TotalLines {
 			continue
 		}
@@ -158,6 +154,8 @@ var htmlCoverageReportTemplate = template.Must(
 		Funcs(template.FuncMap{"IntsJoin": intsJoin}).
 		Funcs(template.FuncMap{"NormalizeLines": normalizeLines}).
 		Funcs(template.FuncMap{"PercentCovered": percentCovered}).
+		Funcs(template.FuncMap{"IsFullCoverageReport": isFullCoverageReport}).
+		Funcs(template.FuncMap{"IsDiffCoverageReport": isDiffCoverageReport}).
 		Parse(htmlCoverageReport),
 )
 
@@ -189,4 +187,12 @@ func percentCovered(total, covered int) float64 {
 	}
 	percent, _ := strconv.ParseFloat(fmt.Sprintf("%.2f", c), 64)
 	return percent
+}
+
+func isFullCoverageReport(statisticsType StatisticsType) bool {
+	return statisticsType == FullStatisticsType
+}
+
+func isDiffCoverageReport(statisticsType StatisticsType) bool {
+	return statisticsType == DiffStatisticsType
 }

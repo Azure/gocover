@@ -4,6 +4,13 @@ import (
 	"html/template"
 )
 
+type StatisticsType string
+
+const (
+	FullStatisticsType StatisticsType = "full"
+	DiffStatisticsType StatisticsType = "diff"
+)
+
 // Statistics represents the total diff coverage for the HEAD commit.
 // It contains the total coverage and possible coverage profile.
 type Statistics struct {
@@ -23,6 +30,8 @@ type Statistics struct {
 	TotalCoveragePercent float64
 	// CoverageProfile represents the coverage profile for a specific file.
 	CoverageProfile []*CoverageProfile
+	// StatisticsType indicates which type the Statistics is.
+	StatisticsType StatisticsType
 }
 
 // CoverageProfile represents the test coverage information for a file.

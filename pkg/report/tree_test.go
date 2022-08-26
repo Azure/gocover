@@ -120,6 +120,11 @@ func TestCoverageTree(t *testing.T) {
 		if node.Name != "bar.go" {
 			t.Errorf("expect name of leaf node bar.go, but get %s", node.Name)
 		}
+
+		node2 := coverageTree.FindOrCreate("pkg/util/bar.go")
+		if node != node2 {
+			t.Errorf("should same node")
+		}
 	})
 
 	// TODO: handle empty string
