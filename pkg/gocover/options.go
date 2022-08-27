@@ -34,3 +34,36 @@ func NewFullOption() *FullOption {
 func (o *FullOption) Validate() error {
 	return o.DbOption.Validate()
 }
+
+// DiffOptions contains the input to the gocover command.
+type DiffOption struct {
+	CoverProfiles  []string
+	CompareBranch  string
+	RepositoryPath string
+	ModuleDir      string
+	ModulePath     string
+
+	CoverageBaseline float64
+	ReportFormat     string
+	ReportName       string
+	Output           string
+	Excludes         []string
+	Style            string
+
+	DbOption *dbclient.DBOption
+
+	Logger logrus.FieldLogger
+}
+
+// NewDiffOptions returns a Options with default values.
+func NewDiffOption() *DiffOption {
+	return &DiffOption{
+		CompareBranch:    DefaultCompareBranch,
+		CoverageBaseline: DefaultCoverageBaseline,
+		ReportFormat:     "html",
+	}
+}
+
+func (o *DiffOption) Validate() error {
+	return o.DbOption.Validate()
+}

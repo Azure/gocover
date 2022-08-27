@@ -15,17 +15,16 @@ import (
 )
 
 func NewFullCover(o *FullOption) (GoCover, error) {
-	var err error
-	if err = o.Validate(); err != nil {
-		return nil, fmt.Errorf("validate full option: %w", err)
-	}
+	var (
+		dbClient dbclient.DbClient
+		err      error
+	)
 
 	logger := o.Logger
 	if logger == nil {
 		logger = logrus.New()
 	}
 
-	var dbClient dbclient.DbClient
 	if o.DbOption.DataCollectionEnabled {
 		dbClient, err = o.DbOption.GetDbClient(o.Logger)
 		if err != nil {
@@ -49,7 +48,7 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		excludesRegexps: excludesRegexps,
 		moduleDir:       o.ModuleDir,
 		coverageTree:    report.NewCoverageTree(o.ModuleDir),
-		logger:          logger.WithField("source", "diffcover"),
+		logger:          logger.WithField("source", "fullcover"),
 		dbClient:        dbClient,
 		reportGenerator: report.NewReportGenerator(o.Style, o.Output, o.ReportName, o.Logger),
 	}, nil
@@ -115,13 +114,12 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 	m := make(map[string]*report.CoverageProfile)
 	fileCache := make(fileContentsCache)
 	for _, pkg := range *packages {
+		full.logger.Debugf("package: %s", pkg.Name)
 
 		p, err := build.Import(pkg.Name, ".", build.FindOnly)
 		if err != nil {
 			return nil, fmt.Errorf("build import %w", err)
 		}
-
-		full.logger.Debugf("path: %s", p.Root)
 
 		for _, fun := range pkg.Functions {
 
@@ -135,7 +133,6 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 				statistics.CoverageProfile = append(statistics.CoverageProfile, coverProfile)
 			}
 
-			// extract into single function
 			fileContents, err := findFileContents(fileCache, fun.File)
 			if err != nil {
 				return nil, fmt.Errorf("find file contents: %w", err)
