@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -52,17 +52,17 @@ func NewKustoClient(option *KustoOption) (DbClient, error) {
 		ingestor:  in,
 		mappings:  append(basicMappings, option.extraMappings...),
 		extraData: option.extraData,
-		w:         option.Writer,
+		logger:    option.Logger.WithField("source", "KustoClient"),
 	}, nil
 
 }
 
 // KustoClient wraps the kusto ingestor and the extra column data and corresponding mappings.
 type KustoClient struct {
-	ingestor  *ingest.Ingestion
+	ingestor  ingest.Ingestor
 	mappings  []mapping
 	extraData map[string]interface{}
-	w         io.Writer
+	logger    logrus.FieldLogger
 }
 
 var _ DbClient = (*KustoClient)(nil)
@@ -90,8 +90,7 @@ func (client *KustoClient) Store(ctx context.Context, data *Data) error {
 		return fmt.Errorf("ingestor from reader %w", err)
 	}
 
-	fmt.Fprintf(client.w, "send to kusto: %s\n", string(dataBytes))
-
+	client.logger.Debugf("send to kusto: %s\n", string(dataBytes))
 	return nil
 }
 
@@ -102,7 +101,7 @@ type KustoOption struct {
 	Database      string
 	Event         string
 	CustomColumns []string
-	Writer        io.Writer
+	Logger        logrus.FieldLogger
 
 	tenantID     string
 	clientID     string
@@ -135,10 +134,6 @@ func (o *KustoOption) Validate() error {
 	if o.Event == "" {
 		return fmt.Errorf("%s %w", "event", ErrFlagRequired)
 	}
-	// fallback writer to io buffer
-	if o.Writer == nil {
-		o.Writer = &bytes.Buffer{}
-	}
 
 	// each custom column has format: {column}:{datatype}:{value}
 	// token 0: column name
@@ -151,7 +146,7 @@ func (o *KustoOption) Validate() error {
 		}
 
 		if tokens[0] == "" || tokens[1] == "" || tokens[2] == "" {
-			return fmt.Errorf("empty custom column string")
+			return fmt.Errorf("empty custom column string [%s], format is {column}:{datatype}:{value}", m)
 		}
 
 		// build extra data kusto mapping

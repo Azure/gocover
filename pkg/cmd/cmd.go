@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/Azure/gocover/pkg/dbclient"
+	"github.com/Azure/gocover/pkg/gocover"
 	"github.com/Azure/gocover/pkg/gtest"
-	"github.com/Azure/gocover/pkg/report"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.org/x/tools/cover"
 )
 
 var (
@@ -60,6 +59,27 @@ var dbOption = &DBOption{
 	Writer: &bytes.Buffer{},
 }
 
+var dboption = &dbclient.DBOption{}
+
+const (
+	DefaultCoverageBaseline = 80.0
+	FlagVerbose             = "verbose"
+	FlagVerboseShort        = "v"
+)
+
+func createLogger(cmd *cobra.Command) *logrus.Logger {
+	logger := logrus.New()
+	verbose, err := cmd.Flags().GetBool(FlagVerbose)
+	if err != nil {
+		// no verbose flag on the command, It's OK.
+		verbose = false
+	}
+	if verbose {
+		logger.SetLevel(logrus.DebugLevel)
+	}
+	return logger
+}
+
 // NewGoCoverCommand creates a command object for generating diff coverage reporter.
 func NewGoCoverCommand() *cobra.Command {
 
@@ -76,12 +96,14 @@ func NewGoCoverCommand() *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().BoolVar(&dbOption.DataCollectionEnabled, "data-collection-enabled", false, "whether or not enable collecting coverage data")
-	cmd.PersistentFlags().StringVar((*string)(&dbOption.DbType), "", string(dbclient.Kusto), "db client type, default: kusto")
-	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Endpoint, "endpoint", "", "kusto endpoint")
-	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Database, "database", "", "kusto database")
-	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Event, "event", "", "kusto event")
-	cmd.PersistentFlags().StringSliceVar(&dbOption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
+	cmd.PersistentFlags().BoolP(FlagVerbose, FlagVerboseShort, false, "verbose output")
+
+	cmd.PersistentFlags().BoolVar(&dboption.DataCollectionEnabled, "data-collection-enabled", false, "whether or not enable collecting coverage data")
+	cmd.PersistentFlags().StringVar((*string)(&dboption.DbType), "store-type", string(dbclient.None), "db client type")
+	cmd.PersistentFlags().StringVar(&dboption.KustoOption.Endpoint, "endpoint", "", "kusto endpoint")
+	cmd.PersistentFlags().StringVar(&dboption.KustoOption.Database, "database", "", "kusto database")
+	cmd.PersistentFlags().StringVar(&dboption.KustoOption.Event, "event", "", "kusto event")
+	cmd.PersistentFlags().StringSliceVar(&dboption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
 
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
@@ -91,7 +113,6 @@ func NewGoCoverCommand() *cobra.Command {
 
 func newDiffCoverageCommand() *cobra.Command {
 	o := NewDiffOptions()
-
 	cmd := &cobra.Command{
 		Use:     "diff",
 		Short:   "generate diff coverage for go code unit test",
@@ -120,13 +141,8 @@ func newDiffCoverageCommand() *cobra.Command {
 
 	return cmd
 }
-
 func newFullCoverageCommand() *cobra.Command {
-	var (
-		modulePath     string
-		repositoryPath string
-		coverProfile   string
-	)
+	o := gocover.NewFullOption()
 
 	cmd := &cobra.Command{
 		Use:     "full",
@@ -134,78 +150,32 @@ func newFullCoverageCommand() *cobra.Command {
 		Long:    fullLong,
 		Example: fullExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			profiles, err := cover.ParseProfiles(coverProfile)
+			o.Logger = createLogger(cmd)
+			o.DbOption = dboption
+
+			full, err := gocover.NewFullCover(o)
 			if err != nil {
-				return fmt.Errorf("parse %s: %s", coverProfile, err)
+				return fmt.Errorf("NewFullCover: %w", err)
 			}
 
-			fullCoverage, err := report.NewFullCoverage(profiles, modulePath, repositoryPath, []string{}, cmd.OutOrStdout())
-			if err != nil {
-				return fmt.Errorf("new full coverage: %s", err)
-			}
-
-			all, err := fullCoverage.BuildFullCoverageTree()
-			if err != nil {
-				return fmt.Errorf("build full coverage tree: %s", err)
-			}
-
-			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", "Summary of coverage:")
-			var coverage float64
-			for _, info := range all {
-				if info.TotalEffectiveLines == 0 {
-					coverage = 100.0
-				} else {
-					coverage = float64(info.TotalCoveredLines) / float64(info.TotalEffectiveLines) * 100
-				}
-
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %d %d %d %d %.1f%%\n",
-					info.Path,
-					info.TotalEffectiveLines,
-					info.TotalCoveredLines,
-					info.TotalIgnoredLines,
-					info.TotalLines,
-					coverage,
-				)
-			}
-
-			if dbOption.DataCollectionEnabled {
-				dbClient, err := dbOption.GetDbClient()
-				if err != nil {
-					return fmt.Errorf("new db client: %w", err)
-				}
-
-				now := time.Now().UTC()
-				for _, info := range all {
-					if info.TotalEffectiveLines == 0 {
-						coverage = 100.0
-					} else {
-						coverage = float64(info.TotalCoveredLines) / float64(info.TotalEffectiveLines) * 100
-					}
-
-					err = dbClient.Store(context.Background(), &dbclient.Data{
-						PreciseTimestamp: now,
-						TotalLines:       info.TotalLines,
-						EffectiveLines:   info.TotalEffectiveLines,
-						IgnoredLines:     info.TotalIgnoredLines,
-						CoveredLines:     info.TotalCoveredLines,
-						ModulePath:       modulePath,
-						FilePath:         info.Path,
-						Coverage:         coverage,
-						CoverageMode:     string(dbclient.FullCoverage),
-					})
-					if err != nil {
-						return fmt.Errorf("store data: %w", err)
-					}
-				}
+			ctx := context.Background()
+			if err := full.Run(ctx); err != nil {
+				return fmt.Errorf("generate full coverage: %w", err)
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&coverProfile, "cover-profile", "", `coverage profile produced by 'go test'`)
-	cmd.Flags().StringVar(&repositoryPath, "repository-path", "./", `the root directory of git repository`)
-	cmd.Flags().StringVar(&modulePath, "host-path", "", "host path for the go project")
+	cmd.Flags().StringSliceVar(&o.CoverProfiles, "cover-profile", []string{}, `coverage profiles produced by 'go test'`)
+	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
+	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
+	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
+	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
+	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
+	cmd.Flags().StringVar(&o.ModuleDir, "module-path", "", "module path for the go project")
 
 	cmd.MarkFlagRequired("cover-profile")
 

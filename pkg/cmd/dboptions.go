@@ -30,7 +30,6 @@ func (o *DBOption) Validate() error {
 
 func (o *DBOption) GetDbClient() (dbclient.DbClient, error) {
 	if o.DbType == dbclient.Kusto {
-		o.KustoOption.Writer = o.Writer
 		return dbclient.NewKustoClient(&o.KustoOption)
 	}
 

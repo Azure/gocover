@@ -1,8 +1,8 @@
 package report
 
 // htmlCoverageReport is the templates contents for html style coverage report.
-var htmlCoverageReport = `
-<!DOCTYPE html>
+var htmlCoverageReport = "" +
+	`<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -25,8 +25,14 @@ var htmlCoverageReport = `
 </head>
 
 <body>
-    <h1>Diff Coverage</h1>
-    <p>Diff: {{ .ComparedBranch }}...HEAD</p>
+    {{ if IsFullCoverageReport .StatisticsType }}
+        <h1>Full Coverage</h1>
+    {{ end }}
+
+    {{ if IsDiffCoverageReport .StatisticsType }}
+        <h1>Diff Coverage</h1>
+        <p>Diff: {{ .ComparedBranch }}...HEAD</p>
+    {{ end }}
 
     {{ if .CoverageProfile }}
     <ul>
@@ -37,10 +43,10 @@ var htmlCoverageReport = `
             <b>Effective</b>: {{ NormalizeLines .TotalEffectiveLines }}
         </li>
         <li>
-            <b>Ignored</b>: {{ NormalizeLines .TotalIgnoredLines }}
+            <b>Covered</b>: {{ NormalizeLines .TotalCoveredLines }}
         </li>
         <li>
-            <b>Missing</b>: {{ NormalizeLines .TotalViolationLines }}
+            <b>Ignored</b>: {{ NormalizeLines .TotalIgnoredLines }}
         </li>
         <li>
             <b>Coverage</b>: {{ .TotalCoveragePercent }}%
@@ -50,8 +56,16 @@ var htmlCoverageReport = `
         <thead>
             <tr>
                 <th>Source File</th>
-                <th>Diff Coverage (%)</th>
-                <th>Missing Lines</th>
+                {{ if IsFullCoverageReport .StatisticsType }}
+                    <th>Full Coverage (%)</th>
+                {{ end }}
+                {{ if IsDiffCoverageReport .StatisticsType }}
+                    <th>Diff Coverage (%)</th>
+                {{ end }}
+                <th>Covered Lines</th>
+                <th>Ignored Lines</th>
+                <th>Effective Lines</th>
+                <th>Total Lines</th>
             </tr>
         </thead>
         <tbody>
@@ -59,7 +73,10 @@ var htmlCoverageReport = `
             <tr>
                 <td>{{ .FileName }}</td>
                 <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines }}</td>
-                <td>{{ IntsJoin .TotalViolationLines }}</td>
+                <td>{{ .CoveredLines }}</td>
+                <td>{{ .TotalIgnoredLines }}</td>
+                <td>{{ .TotalEffectiveLines }}</td>
+                <td>{{ .TotalLines }}</td>
             </tr>
             {{ end }}
         </tbody>

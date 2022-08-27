@@ -9,6 +9,7 @@ import (
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/Azure/gocover/pkg/report"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"golang.org/x/tools/cover"
 )
@@ -70,8 +71,8 @@ func (o *DiffOptions) Run(cmd *cobra.Command, args []string, dbopt DBOption) err
 		return fmt.Errorf("diff coverage: %w", err)
 	}
 
-	g := report.NewReportGenerator(statistics, o.Style, o.Output, o.ReportName, o.Writer)
-	if err := g.GenerateReport(); err != nil {
+	g := report.NewReportGenerator(o.Style, o.Output, o.ReportName, logrus.New())
+	if err := g.GenerateReport(statistics); err != nil {
 		return fmt.Errorf("generate report: %w", err)
 	}
 
