@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -55,16 +54,11 @@ gocover full --cover-profile coverage.out --host-path github.com/Azure/gocover \
 `
 )
 
-var dbOption = &DBOption{
-	Writer: &bytes.Buffer{},
-}
-
-var dboption = &dbclient.DBOption{}
+var dbOption = &dbclient.DBOption{}
 
 const (
-	DefaultCoverageBaseline = 80.0
-	FlagVerbose             = "verbose"
-	FlagVerboseShort        = "v"
+	FlagVerbose      = "verbose"
+	FlagVerboseShort = "v"
 )
 
 func createLogger(cmd *cobra.Command) *logrus.Logger {
@@ -88,7 +82,6 @@ func NewGoCoverCommand() *cobra.Command {
 		Short:        "coverage tool for go code",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			dbOption.Writer = cmd.OutOrStdout()
 			if err := dbOption.Validate(); err != nil {
 				return err
 			}
@@ -98,12 +91,12 @@ func NewGoCoverCommand() *cobra.Command {
 
 	cmd.PersistentFlags().BoolP(FlagVerbose, FlagVerboseShort, false, "verbose output")
 
-	cmd.PersistentFlags().BoolVar(&dboption.DataCollectionEnabled, "data-collection-enabled", false, "whether or not enable collecting coverage data")
-	cmd.PersistentFlags().StringVar((*string)(&dboption.DbType), "store-type", string(dbclient.None), "db client type")
-	cmd.PersistentFlags().StringVar(&dboption.KustoOption.Endpoint, "endpoint", "", "kusto endpoint")
-	cmd.PersistentFlags().StringVar(&dboption.KustoOption.Database, "database", "", "kusto database")
-	cmd.PersistentFlags().StringVar(&dboption.KustoOption.Event, "event", "", "kusto event")
-	cmd.PersistentFlags().StringSliceVar(&dboption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
+	cmd.PersistentFlags().BoolVar(&dbOption.DataCollectionEnabled, "data-collection-enabled", false, "whether or not enable collecting coverage data")
+	cmd.PersistentFlags().StringVar((*string)(&dbOption.DbType), "store-type", string(dbclient.None), "db client type")
+	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Endpoint, "endpoint", "", "kusto endpoint")
+	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Database, "database", "", "kusto database")
+	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Event, "event", "", "kusto event")
+	cmd.PersistentFlags().StringSliceVar(&dbOption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
 
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
@@ -112,21 +105,31 @@ func NewGoCoverCommand() *cobra.Command {
 }
 
 func newDiffCoverageCommand() *cobra.Command {
-	o := NewDiffOptions()
+	o := gocover.NewDiffOption()
 	cmd := &cobra.Command{
 		Use:     "diff",
 		Short:   "generate diff coverage for go code unit test",
 		Long:    diffLong,
 		Example: diffExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := o.Run(cmd, args, *dbOption); err != nil {
-				return fmt.Errorf("generate diff coverage %w", err)
+			o.Logger = createLogger(cmd)
+			o.DbOption = dbOption
+
+			diff, err := gocover.NewDiffCover(o)
+			if err != nil {
+				return fmt.Errorf("NewDiffCover: %w", err)
 			}
+
+			ctx := context.Background()
+			if err := diff.Run(ctx); err != nil {
+				return fmt.Errorf("generate diff coverage: %w", err)
+			}
+
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&o.CoverProfile, "cover-profile", o.CoverProfile, `coverage profile produced by 'go test'`)
+	cmd.Flags().StringSliceVar(&o.CoverProfiles, "cover-profile", []string{}, `coverage profile produced by 'go test'`)
 	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
 	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
@@ -135,12 +138,13 @@ func newDiffCoverageCommand() *cobra.Command {
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
-	cmd.Flags().StringVar(&o.ModulePath, "host-path", "", "host path for the go project")
+	cmd.Flags().StringVar(&o.ModuleDir, "module-path", "", "module path for the go project")
 
 	cmd.MarkFlagRequired("cover-profile")
 
 	return cmd
 }
+
 func newFullCoverageCommand() *cobra.Command {
 	o := gocover.NewFullOption()
 
@@ -151,7 +155,7 @@ func newFullCoverageCommand() *cobra.Command {
 		Example: fullExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Logger = createLogger(cmd)
-			o.DbOption = dboption
+			o.DbOption = dbOption
 
 			full, err := gocover.NewFullCover(o)
 			if err != nil {

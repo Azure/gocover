@@ -52,6 +52,12 @@ var htmlCoverageReport = "" +
             <b>Coverage</b>: {{ .TotalCoveragePercent }}%
         </li>
     </ul>
+
+    <p>
+        <b>Coverage</b> = Covered / Effective <br />
+        <b>Total</b> = Effective + Ignored
+    </p>
+
     <table border="1">
         <thead>
             <tr>

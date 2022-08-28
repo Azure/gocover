@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	DefaultCompareBranch    = "origin/master"
 	DefaultCoverageBaseline = 80.0
 )
 
