@@ -32,7 +32,12 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		}
 	}
 
-	modulePath, err := parseGoModulePath(o.ModuleDir)
+	p, err := filepath.Abs(o.RepositoryPath)
+	if err != nil {
+		return nil, err
+	}
+
+	modulePath, err := parseGoModulePath(filepath.Join(p, o.ModuleDir))
 	if err != nil {
 		return nil, fmt.Errorf("parse go module path: %w", err)
 	}
