@@ -52,6 +52,16 @@ gocover full --cover-profile coverage.out --host-path github.com/Azure/gocover \
 	--database kustodb_name \
 	--event kusto_event
 `
+
+	gocoverTestLong = `Run unit tests on the module, then apply full coverage or diff coverage calculation on the results.
+	`
+	gocoverTestExample = "" +
+		`# Run unit tests and generate diff coverage result.
+gocover test --coverage-mode diff --compare-branch=origin/master --output /tmp
+
+# Run unit tests and generate full coverage result on the whole module.
+gocover test --coverage-mode full --output /tmp
+`
 )
 
 var dbOption = &dbclient.DBOption{}
@@ -194,7 +204,10 @@ func newGoCoverTestCommand() *cobra.Command {
 	o := gocover.NewGoCoverTestOption()
 
 	cmd := &cobra.Command{
-		Use: "test",
+		Use:     "test",
+		Short:   "run tests and coverage calculation on the module",
+		Long:    gocoverTestLong,
+		Example: gocoverTestExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.Logger = createLogger(cmd)
 			o.DbOption = dbOption
