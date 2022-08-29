@@ -144,7 +144,8 @@ func (g *gitClient) buildChangeFromPatch(filePatch diff.FilePatch) (*Change, err
 
 func isGoFile(fileInfo diff.File) bool {
 	return fileInfo.Mode() == filemode.Regular &&
-		strings.HasSuffix(fileInfo.Path(), ".go")
+		strings.HasSuffix(fileInfo.Path(), ".go") &&
+		!strings.HasSuffix(fileInfo.Path(), "_test.go")
 }
 
 // buildChangeFromChunks builds the diff change from git chunks.

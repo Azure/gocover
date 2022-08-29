@@ -393,6 +393,17 @@ func TestIsGoFile(t *testing.T) {
 				return filemode.Regular
 			},
 			PathFn: func() string {
+				return "pkg/foo_test.go"
+			},
+		}); result != false {
+			t.Errorf("should false but return %t", result)
+		}
+
+		if result := isGoFile(&mockFile{
+			ModeFn: func() filemode.FileMode {
+				return filemode.Regular
+			},
+			PathFn: func() string {
 				return "pkg/config.yaml"
 			},
 		}); result != false {
