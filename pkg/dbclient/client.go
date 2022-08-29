@@ -16,13 +16,6 @@ const (
 	Kusto ClientType = "Kusto"
 )
 
-type CoverageMode string
-
-const (
-	FullCoverage CoverageMode = "full"
-	DiffCoverage CoverageMode = "diff"
-)
-
 // DbClient interface for storing gocover data.
 type DbClient interface {
 	Store(context context.Context, data *Data) error

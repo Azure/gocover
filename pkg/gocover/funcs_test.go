@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -98,12 +99,12 @@ func TestStore(t *testing.T) {
 			{TotalLines: 120, TotalEffectiveLines: 100, TotalIgnoredLines: 20, TotalCoveredLines: 80},
 		}
 
-		err := store(context.Background(), client, all, dbclient.FullCoverage, "")
+		err := store(context.Background(), client, all, FullCoverage, "")
 		if err != nil {
 			t.Errorf("should return nil, but get error: %s", err)
 		}
 
-		err = store(context.Background(), client, nil, dbclient.FullCoverage, "")
+		err = store(context.Background(), client, nil, FullCoverage, "")
 		if err != nil {
 			t.Errorf("should return nil, but get error: %s", err)
 		}
@@ -120,9 +121,46 @@ func TestStore(t *testing.T) {
 			{TotalLines: 120, TotalEffectiveLines: 100, TotalIgnoredLines: 20, TotalCoveredLines: 80},
 		}
 
-		err := store(context.Background(), client, all, dbclient.FullCoverage, "")
+		err := store(context.Background(), client, all, FullCoverage, "")
 		if err == nil {
 			t.Errorf("should return error, but no error")
+		}
+	})
+}
+
+func TestParseGoModulePath(t *testing.T) {
+	t.Run("parse go module path from go.mod", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, "foo"), os.ModePerm)
+		os.MkdirAll(filepath.Join(dir, "empty"), os.ModePerm)
+		os.MkdirAll(filepath.Join(dir, "nonexist"), os.ModePerm)
+
+		ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/Azure/gocover"), 0644)
+		ioutil.WriteFile(filepath.Join(dir, "foo/go.mod"), []byte("module github.com/Azure/gocover/foo"), 0644)
+		ioutil.WriteFile(filepath.Join(dir, "empty/go.mod"), []byte(""), 0644)
+
+		var testSuites = []struct {
+			input  string
+			expect string
+			err    error
+		}{
+			{input: filepath.Join(dir, "."), expect: "github.com/Azure/gocover", err: nil},
+			{input: filepath.Join(dir, "foo"), expect: "github.com/Azure/gocover/foo", err: nil},
+			{input: filepath.Join(dir, "empty"), expect: "", err: ErrModuleNotFound},
+			{input: filepath.Join(dir, "nonexist"), expect: "", err: errors.New("file not exists")},
+		}
+
+		for _, testCase := range testSuites {
+			actual, err := parseGoModulePath(testCase.input)
+			if actual != testCase.expect {
+				t.Errorf("should %s, but get %s", testCase.expect, actual)
+			}
+			if testCase.err == nil && testCase.err != err {
+				t.Errorf("error should nil but get %s", err)
+			}
+			if testCase.err != nil && err == nil {
+				t.Errorf("error should be %s, but get nil", testCase.err)
+			}
 		}
 	})
 }

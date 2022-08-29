@@ -57,6 +57,15 @@ gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}cover
 
 - Note: Before the coverage inspection, we will check whether a _test.go file exist within each package. 
 
+
+### Run unit test and get coverage results in one command
+
+Use following command to run the unit tests and get coverage on the module.
+The cover profiles and coverage result are written in the output directory.
+```bash
+gocover test --repository-path=${REPO ROOT PATH} --coverage-mode [diff|full] --output /tmp
+```
+
 ### Set Ignore Annotations
 
 Use `//+gocover:ignore:file comments` or `//+gocover:ignore:block comments` as annotation, do not add any space among words, and adding non-empty comments. Note that comments does not support multiple lines.
