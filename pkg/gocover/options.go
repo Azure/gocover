@@ -1,6 +1,9 @@
 package gocover
 
 import (
+	"errors"
+	"io"
+
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/sirupsen/logrus"
 )
@@ -27,7 +30,7 @@ type FullOption struct {
 func NewFullOption() *FullOption {
 	return &FullOption{
 		CoverageBaseline: DefaultCoverageBaseline,
-		ReportFormat:     "html",
+		ReportFormat:     DefaultReportFormat,
 	}
 }
 
@@ -35,7 +38,7 @@ func (o *FullOption) Validate() error {
 	return o.DbOption.Validate()
 }
 
-// DiffOptions contains the input to the gocover command.
+// DiffOption contains the input to the gocover diff command.
 type DiffOption struct {
 	CoverProfiles  []string
 	CompareBranch  string
@@ -60,10 +63,51 @@ func NewDiffOption() *DiffOption {
 	return &DiffOption{
 		CompareBranch:    DefaultCompareBranch,
 		CoverageBaseline: DefaultCoverageBaseline,
-		ReportFormat:     "html",
+		ReportFormat:     DefaultReportFormat,
 	}
 }
 
 func (o *DiffOption) Validate() error {
 	return o.DbOption.Validate()
+}
+
+type CoverageMode string
+
+const (
+	FullCoverage CoverageMode = "full"
+	DiffCoverage CoverageMode = "diff"
+)
+
+var ErrUnknownCoverageMode = errors.New("unknown coverage mode")
+
+// GoCoverTestOption contains the input to the gocover govtest command.
+type GoCoverTestOption struct {
+	CoverProfiles  []string
+	CompareBranch  string
+	RepositoryPath string
+	ModuleDir      string
+	ModulePath     string
+	CoverageMode   CoverageMode
+
+	CoverageBaseline float64
+	ReportFormat     string
+	ReportName       string
+	Output           string
+	Excludes         []string
+	Style            string
+
+	DbOption *dbclient.DBOption
+
+	StdOut io.Writer
+	StdErr io.Writer
+	Logger logrus.FieldLogger
+}
+
+// NewGoCoverTestOption returns a Options with default values.
+func NewGoCoverTestOption() *GoCoverTestOption {
+	return &GoCoverTestOption{
+		CompareBranch:    DefaultCompareBranch,
+		CoverageBaseline: DefaultCoverageBaseline,
+		ReportFormat:     DefaultReportFormat,
+	}
 }

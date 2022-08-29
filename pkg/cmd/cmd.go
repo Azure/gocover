@@ -3,10 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/gocover"
-	"github.com/Azure/gocover/pkg/gtest"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -100,7 +100,7 @@ func NewGoCoverCommand() *cobra.Command {
 
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
-	cmd.AddCommand(newTestCommand())
+	cmd.AddCommand(newGoCoverTestCommand())
 	return cmd
 }
 
@@ -120,7 +120,9 @@ func newDiffCoverageCommand() *cobra.Command {
 				return fmt.Errorf("NewDiffCover: %w", err)
 			}
 
-			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+
 			if err := diff.Run(ctx); err != nil {
 				return fmt.Errorf("generate diff coverage: %w", err)
 			}
@@ -162,7 +164,9 @@ func newFullCoverageCommand() *cobra.Command {
 				return fmt.Errorf("NewFullCover: %w", err)
 			}
 
-			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+
 			if err := full.Run(ctx); err != nil {
 				return fmt.Errorf("generate full coverage: %w", err)
 			}
@@ -186,28 +190,35 @@ func newFullCoverageCommand() *cobra.Command {
 	return cmd
 }
 
-func newTestCommand() *cobra.Command {
-	var (
-		repositoryPath string
-		compareBranch  string
-	)
+func newGoCoverTestCommand() *cobra.Command {
+	o := gocover.NewGoCoverTestOption()
+
 	cmd := &cobra.Command{
 		Use: "test",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			gocoverTest, err := gtest.NewGocoverTest(repositoryPath, compareBranch, cmd.OutOrStdout())
-			if err != nil {
-				return fmt.Errorf("new gocover test: %s", err)
-			}
+			o.Logger = createLogger(cmd)
+			o.DbOption = dbOption
+			o.StdOut = cmd.OutOrStdout()
+			o.StdErr = cmd.ErrOrStderr()
 
-			err = gocoverTest.EnsureGoTestFiles()
-			if err != nil {
-				return fmt.Errorf("check go test files: %s", err)
-			}
-			return nil
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+
+			t := gocover.NewGoCoverTest(o)
+			return t.RunTests(ctx)
 		},
 	}
 
-	cmd.Flags().StringVar(&repositoryPath, "repository-path", "./", `the root directory of git repository`)
-	cmd.Flags().StringVar(&compareBranch, "compare-branch", "origin/master", `branch to compare`)
+	cmd.Flags().StringSliceVar(&o.CoverProfiles, "cover-profile", []string{}, `coverage profile produced by 'go test'`)
+	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
+	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
+	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
+	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
+	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
+	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
+	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
+	cmd.Flags().StringVar(&o.ModuleDir, "module-path", "", "module path for the go project")
+	cmd.Flags().StringVar((*string)(&o.CoverageMode), "coverage-mode", string(gocover.FullCoverage), `mode for coverage, "full" or "diff"`)
 	return cmd
 }

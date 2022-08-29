@@ -32,6 +32,11 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		}
 	}
 
+	modulePath, err := parseGoModulePath(o.ModuleDir)
+	if err != nil {
+		return nil, fmt.Errorf("parse go module path: %w", err)
+	}
+
 	var excludesRegexps []*regexp.Regexp
 	for _, ignorePattern := range o.Excludes {
 		reg, err := regexp.Compile(ignorePattern)
@@ -43,11 +48,11 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 
 	return &fullCover{
 		coverFilenames:  o.CoverProfiles,
-		modulePath:      o.ModuleDir,
+		modulePath:      modulePath,
 		repositoryPath:  o.RepositoryPath,
 		excludesRegexps: excludesRegexps,
 		moduleDir:       o.ModuleDir,
-		coverageTree:    report.NewCoverageTree(o.ModuleDir),
+		coverageTree:    report.NewCoverageTree(modulePath),
 		logger:          logger.WithField("source", "fullcover"),
 		dbClient:        dbClient,
 		reportGenerator: report.NewReportGenerator(o.Style, o.Output, o.ReportName, o.Logger),
@@ -92,7 +97,7 @@ func (full *fullCover) dump(ctx context.Context) error {
 	all := full.coverageTree.All()
 
 	if full.dbClient != nil {
-		err := store(ctx, full.dbClient, all, dbclient.FullCoverage, full.moduleDir)
+		err := store(ctx, full.dbClient, all, FullCoverage, full.moduleDir)
 		if err != nil {
 			return fmt.Errorf("store data: %w", err)
 		}

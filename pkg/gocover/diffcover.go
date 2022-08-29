@@ -35,6 +35,11 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 		}
 	}
 
+	modulePath, err := parseGoModulePath(o.ModuleDir)
+	if err != nil {
+		return nil, fmt.Errorf("parse go module path: %w", err)
+	}
+
 	var excludesRegexps []*regexp.Regexp
 	for _, ignorePattern := range o.Excludes {
 		reg, err := regexp.Compile(ignorePattern)
@@ -47,9 +52,9 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 	return &diffCover{
 		comparedBranch:  o.CompareBranch,
 		moduleDir:       o.ModuleDir,
-		modulePath:      o.ModuleDir,
+		modulePath:      modulePath,
 		excludesRegexps: excludesRegexps,
-		coverageTree:    report.NewCoverageTree(o.ModuleDir),
+		coverageTree:    report.NewCoverageTree(modulePath),
 		repositoryPath:  o.RepositoryPath,
 		coverFilenames:  o.CoverProfiles,
 		dbClient:        dbClient,
@@ -104,7 +109,7 @@ func (diff *diffCover) dump(ctx context.Context) error {
 	all := diff.coverageTree.All()
 
 	if diff.dbClient != nil {
-		err := store(ctx, diff.dbClient, all, dbclient.FullCoverage, diff.moduleDir)
+		err := store(ctx, diff.dbClient, all, FullCoverage, diff.moduleDir)
 		if err != nil {
 			return fmt.Errorf("store data: %w", err)
 		}
