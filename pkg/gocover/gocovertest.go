@@ -2,6 +2,7 @@ package gocover
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"io/ioutil"
@@ -19,7 +20,7 @@ func NewGoCoverTest(o *GoCoverTestOption) *goCoverTest {
 		outputDir: o.Output,
 		stdout:    o.StdOut,
 		stderr:    o.StdErr,
-		logger:    o.Logger,
+		logger:    o.Logger.WithField("source", "GoCoverTest"),
 		mode:      o.CoverageMode,
 		option:    o,
 	}
@@ -45,27 +46,34 @@ func (t *goCoverTest) RunTests(ctx context.Context) error {
 	}
 
 	if err := os.MkdirAll(t.outputDir, fs.ModePerm); err != nil {
-		return err
+		return fmt.Errorf("create output directory %s: %w", t.outputDir, err)
 	}
 	coverFile := filepath.Join(t.outputDir, "coverage.out")
-	cmd := exec.Command(goCmd(), "test", "./...", "-coverprofile", coverFile, "-coverpkg=./...", "-v")
+	cmd := exec.Command(goCmd(), "test", "./...", "-coverprofile", coverFile, "-coverpkg=./", "-v")
 	cmd.Dir = t.moduleDir
 	cmd.Stdin = nil
 	cmd.Stdout = t.stdout
 	cmd.Stderr = t.stderr
 	err := cmd.Run()
 	if err != nil {
+		err = fmt.Errorf(`run unit test "go test ./... -coverprofile %s -coverpkg=./ -v" failed: %w`, coverFile, err)
+		t.logger.WithError(err).Error()
 		return err
 	}
-
-	t.logger.Debugf("output: %s\n", coverFile)
 
 	gocover, err := t.getGoCover([]string{coverFile})
 	if err != nil {
 		return err
 	}
 
-	return gocover.Run(ctx)
+	t.logger.Debugf("cover profile: %s", coverFile)
+	t.logger.WithField("module", t.moduleDir).Debugf("run unit test succeeded")
+	if err := gocover.Run(ctx); err != nil {
+		err := fmt.Errorf("run gocover: %w", err)
+		t.logger.WithError(err).Error()
+		return err
+	}
+	return nil
 }
 
 func (t *goCoverTest) getGoCover(coverProfiles []string) (GoCover, error) {
