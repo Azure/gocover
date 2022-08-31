@@ -17,7 +17,7 @@ type FullOption struct {
 	CoverageBaseline float64
 	ReportFormat     string
 	ReportName       string
-	Output           string
+	OutputDir        string
 	Excludes         []string
 	Style            string
 
@@ -49,7 +49,7 @@ type DiffOption struct {
 	CoverageBaseline float64
 	ReportFormat     string
 	ReportName       string
-	Output           string
+	OutputDir        string
 	Excludes         []string
 	Style            string
 
@@ -92,7 +92,7 @@ type GoCoverTestOption struct {
 	CoverageBaseline float64
 	ReportFormat     string
 	ReportName       string
-	Output           string
+	OutputDir        string
 	Excludes         []string
 	Style            string
 
