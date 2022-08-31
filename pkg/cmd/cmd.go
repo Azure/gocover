@@ -57,10 +57,10 @@ gocover full --cover-profile coverage.out --host-path github.com/Azure/gocover \
 	`
 	gocoverTestExample = "" +
 		`# Run unit tests and generate diff coverage result.
-gocover test --coverage-mode diff --compare-branch=origin/master --output /tmp
+gocover test --coverage-mode diff --compare-branch=origin/master --outputdir /tmp
 
 # Run unit tests and generate full coverage result on the whole module.
-gocover test --coverage-mode full --output /tmp
+gocover test --coverage-mode full --outputdir /tmp
 `
 )
 
@@ -144,13 +144,13 @@ func newDiffCoverageCommand() *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.CoverProfiles, "cover-profile", []string{}, `coverage profile produced by 'go test'`)
 	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
 	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&o.ModuleDir, "module-dir", "./", "module directory contains go.mod file that relative to the project")
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
 	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
+	cmd.Flags().StringVarP(&o.OutputDir, "outputdir", "o", o.OutputDir, "diff coverage output directory")
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
-	cmd.Flags().StringVar(&o.ModuleDir, "module-path", "", "module path for the go project")
 
 	cmd.MarkFlagRequired("cover-profile")
 
@@ -187,13 +187,13 @@ func newFullCoverageCommand() *cobra.Command {
 
 	cmd.Flags().StringSliceVar(&o.CoverProfiles, "cover-profile", []string{}, `coverage profiles produced by 'go test'`)
 	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&o.ModuleDir, "module-dir", "./", "module directory contains go.mod file that relative to the project")
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
 	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
+	cmd.Flags().StringVarP(&o.OutputDir, "outputdir", "o", o.OutputDir, "diff coverage output directory")
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
-	cmd.Flags().StringVar(&o.ModuleDir, "module-path", "", "module path for the go project")
 
 	cmd.MarkFlagRequired("cover-profile")
 
@@ -217,7 +217,10 @@ func newGoCoverTestCommand() *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 			defer cancel()
 
-			t := gocover.NewGoCoverTest(o)
+			t, err := gocover.NewGoCoverTest(o)
+			if err != nil {
+				return fmt.Errorf("NewGoCoverTest: %w", err)
+			}
 			return t.RunTests(ctx)
 		},
 	}
@@ -225,13 +228,13 @@ func newGoCoverTestCommand() *cobra.Command {
 	cmd.Flags().StringSliceVar(&o.CoverProfiles, "cover-profile", []string{}, `coverage profile produced by 'go test'`)
 	cmd.Flags().StringVar(&o.CompareBranch, "compare-branch", o.CompareBranch, `branch to compare`)
 	cmd.Flags().StringVar(&o.RepositoryPath, "repository-path", "./", `the root directory of git repository`)
+	cmd.Flags().StringVar(&o.ModuleDir, "module-dir", "./", "module directory contains go.mod file that relative to the project")
 	cmd.Flags().StringVar(&o.ReportFormat, "format", o.ReportFormat, "format of the diff coverage report, one of: html, json, markdown")
 	cmd.Flags().StringSliceVar(&o.Excludes, "excludes", []string{}, "exclude files for diff coverage calucation")
-	cmd.Flags().StringVarP(&o.Output, "output", "o", o.Output, "diff coverage output file")
+	cmd.Flags().StringVarP(&o.OutputDir, "outputdir", "o", o.OutputDir, "diff coverage output directory")
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
-	cmd.Flags().StringVar(&o.ModuleDir, "module-path", "", "module path for the go project")
 	cmd.Flags().StringVar((*string)(&o.CoverageMode), "coverage-mode", string(gocover.FullCoverage), `mode for coverage, "full" or "diff"`)
 	return cmd
 }

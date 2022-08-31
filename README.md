@@ -63,8 +63,10 @@ gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}cover
 Use following command to run the unit tests and get coverage on the module.
 The cover profiles and coverage result are written in the output directory.
 ```bash
-gocover test --repository-path=${REPO ROOT PATH} --coverage-mode [diff|full] --output /tmp
+gocover test --repository-path=${REPO ROOT PATH} --coverage-mode [diff|full] --outputdir /tmp
 ```
+
+For the project has multiple module, please specify `module-dir` to generates the coverage for the module. `module-dir` flag is the relative path to the root of the project.
 
 ### Set Ignore Annotations
 

@@ -8,13 +8,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/Azure/gocover/pkg/parser"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/tools/cover"
 )
 
 func NewDiffCover(o *DiffOption) (GoCover, error) {
@@ -27,6 +25,7 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 	if logger == nil {
 		logger = logrus.New()
 	}
+	logger = logger.WithField("source", "diffcover")
 
 	if o.DbOption.DataCollectionEnabled {
 		dbClient, err = o.DbOption.GetDbClient(o.Logger)
@@ -35,12 +34,12 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 		}
 	}
 
-	p, err := filepath.Abs(o.RepositoryPath)
+	repositoryAbsPath, err := filepath.Abs(o.RepositoryPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get absolute path of repo: %w", err)
 	}
 
-	modulePath, err := parseGoModulePath(filepath.Join(p, o.ModuleDir))
+	modulePath, err := parseGoModulePath(filepath.Join(repositoryAbsPath, o.ModuleDir))
 	if err != nil {
 		return nil, fmt.Errorf("parse go module path: %w", err)
 	}
@@ -54,17 +53,20 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 		excludesRegexps = append(excludesRegexps, reg)
 	}
 
+	logger.Debugf("repository path: %s, module path: %s, output dir: %s", repositoryAbsPath, modulePath, o.OutputDir)
+
 	return &diffCover{
-		comparedBranch:  o.CompareBranch,
-		moduleDir:       o.ModuleDir,
-		modulePath:      modulePath,
-		excludesRegexps: excludesRegexps,
-		coverageTree:    report.NewCoverageTree(modulePath),
-		repositoryPath:  o.RepositoryPath,
-		coverFilenames:  o.CoverProfiles,
-		dbClient:        dbClient,
-		reportGenerator: report.NewReportGenerator(o.Style, o.Output, o.ReportName, o.Logger),
-		logger:          logger.WithField("source", "diffcover"),
+		comparedBranch:   o.CompareBranch,
+		moduleDir:        o.ModuleDir,
+		modulePath:       modulePath,
+		excludesRegexps:  excludesRegexps,
+		coverageTree:     report.NewCoverageTree(modulePath),
+		repositoryPath:   repositoryAbsPath,
+		coverFilenames:   o.CoverProfiles,
+		coverageBaseline: o.CoverageBaseline,
+		dbClient:         dbClient,
+		reportGenerator:  report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger),
+		logger:           logger,
 	}, nil
 
 }
@@ -74,16 +76,13 @@ var _ GoCover = (*diffCover)(nil)
 // diffCoverage implements the DiffCoverage interface
 // and generate the diff coverage statistics
 type diffCover struct {
-	comparedBranch  string            // git diff base branch
-	profiles        []*cover.Profile  // go unit test coverage profiles
-	changes         []*gittool.Change // diff change between compared branch and HEAD commit
-	excludesRegexps []*regexp.Regexp  // excludes files regexp patterns
-	repositoryPath  string
-	ignoreProfiles  map[string]*annotation.IgnoreProfile
-	coverProfiles   map[string]*cover.Profile
-	moduleDir       string
-	modulePath      string
-	coverFilenames  []string
+	comparedBranch   string           // git diff base branch
+	excludesRegexps  []*regexp.Regexp // excludes files regexp patterns
+	repositoryPath   string
+	moduleDir        string
+	modulePath       string
+	coverFilenames   []string
+	coverageBaseline float64
 
 	reportGenerator report.ReportGenerator
 	coverageTree    report.CoverageTree
@@ -104,9 +103,23 @@ func (diff *diffCover) Run(ctx context.Context) error {
 	}
 
 	if err := diff.dump(ctx); err != nil {
-		return fmt.Errorf(" %w", err)
+		return fmt.Errorf("%w", err)
 	}
 
+	if err := diff.pass(statistics); err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	return nil
+}
+
+func (diff *diffCover) pass(statistics *report.Statistics) error {
+	if statistics.TotalCoveragePercent < diff.coverageBaseline {
+		return fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
+			diff.coverageBaseline,
+			statistics.TotalCoveragePercent,
+		)
+	}
 	return nil
 }
 

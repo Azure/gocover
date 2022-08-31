@@ -24,6 +24,7 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 	if logger == nil {
 		logger = logrus.New()
 	}
+	logger = logger.WithField("source", "fullcover")
 
 	if o.DbOption.DataCollectionEnabled {
 		dbClient, err = o.DbOption.GetDbClient(o.Logger)
@@ -32,12 +33,12 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		}
 	}
 
-	p, err := filepath.Abs(o.RepositoryPath)
+	repositoryAbsPath, err := filepath.Abs(o.RepositoryPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get absolute path of repo: %w", err)
 	}
 
-	modulePath, err := parseGoModulePath(filepath.Join(p, o.ModuleDir))
+	modulePath, err := parseGoModulePath(filepath.Join(repositoryAbsPath, o.ModuleDir))
 	if err != nil {
 		return nil, fmt.Errorf("parse go module path: %w", err)
 	}
@@ -51,16 +52,18 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		excludesRegexps = append(excludesRegexps, reg)
 	}
 
+	logger.Debugf("repository path: %s, module path: %s, output dir: %s", repositoryAbsPath, modulePath, o.OutputDir)
+
 	return &fullCover{
 		coverFilenames:  o.CoverProfiles,
 		modulePath:      modulePath,
-		repositoryPath:  o.RepositoryPath,
+		repositoryPath:  repositoryAbsPath,
 		excludesRegexps: excludesRegexps,
 		moduleDir:       o.ModuleDir,
 		coverageTree:    report.NewCoverageTree(modulePath),
-		logger:          logger.WithField("source", "fullcover"),
+		logger:          logger,
 		dbClient:        dbClient,
-		reportGenerator: report.NewReportGenerator(o.Style, o.Output, o.ReportName, o.Logger),
+		reportGenerator: report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger),
 	}, nil
 
 }
@@ -92,7 +95,7 @@ func (full *fullCover) Run(ctx context.Context) error {
 	}
 
 	if err := full.dump(ctx); err != nil {
-		return fmt.Errorf(" %w", err)
+		return fmt.Errorf("%w", err)
 	}
 
 	return nil

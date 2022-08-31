@@ -96,7 +96,7 @@ func (g *htmlReportGenerator) GenerateReport(statistics *Statistics) error {
 		return fmt.Errorf("write report: %w", err)
 	}
 
-	g.logger.Debugf("generate html report to %s", reportFile)
+	g.logger.Infof("generate html coverage report: %s", reportFile)
 	return nil
 }
 
