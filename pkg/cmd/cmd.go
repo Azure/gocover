@@ -221,7 +221,7 @@ func newGoCoverTestCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("NewGoCoverTest: %w", err)
 			}
-			return t.RunTests(ctx)
+			return t.Run(ctx)
 		},
 	}
 
