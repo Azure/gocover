@@ -30,6 +30,18 @@ func NewGoCoverTestExecutor(o *GoCoverTestOption) (GoCoverTestExecutor, error) {
 		return nil, fmt.Errorf("get absolute path of repo: %w", err)
 	}
 
+	if o.OutputDir == "" {
+		tmpDir, err := ioutil.TempDir("", "gocover")
+		if err != nil {
+			return nil, err
+		}
+		o.OutputDir = tmpDir
+	}
+
+	if err := os.MkdirAll(o.OutputDir, fs.ModePerm); err != nil {
+		return nil, fmt.Errorf("create output directory %s: %w", o.OutputDir, err)
+	}
+
 	if os.Getenv(GinkgoEnabledEnvKey) != "" {
 		return &ginkgoTestExecutor{
 			repositoryPath: repositoryAbsPath,
@@ -73,19 +85,6 @@ type goBuiltInTestExecutor struct {
 }
 
 func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
-	if t.outputDir == "" {
-		tmpDir, err := ioutil.TempDir("", "gocover")
-		if err != nil {
-			return err
-		}
-		t.outputDir = tmpDir
-		t.option.OutputDir = tmpDir
-	}
-
-	if err := os.MkdirAll(t.outputDir, fs.ModePerm); err != nil {
-		return fmt.Errorf("create output directory %s: %w", t.outputDir, err)
-	}
-
 	logger := t.logger.WithFields(
 		logrus.Fields{
 			"moduledir": t.moduleDir,
@@ -140,7 +139,7 @@ func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 		return err
 	}
 
-	one := filepath.Join(e.repositoryPath, e.outputDir, "cover.out")
+	one := filepath.Join(e.outputDir, "cover.out")
 	f, err := os.Create(one)
 	if err != nil {
 		panic(err)
@@ -161,7 +160,6 @@ func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 	}
 	f.Close()
 
-	// gocover, err := buildGoCover(e.mode, e.option, coverFiles, e.logger)
 	gocover, err := buildGoCover(e.mode, e.option, []string{one}, e.logger)
 	if err != nil {
 		return err
@@ -187,19 +185,6 @@ func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 }
 
 func (executor *ginkgoTestExecutor) runTests(ctx context.Context) ([]string, error) {
-	if executor.outputDir == "" {
-		tmpDir, err := ioutil.TempDir("", "gocover")
-		if err != nil {
-			return nil, err
-		}
-		executor.outputDir = tmpDir
-		executor.option.OutputDir = tmpDir
-	}
-
-	if err := os.MkdirAll(executor.outputDir, fs.ModePerm); err != nil {
-		return nil, fmt.Errorf("create output directory %s: %w", executor.outputDir, err)
-	}
-
 	logger := executor.logger.WithFields(
 		logrus.Fields{
 			"moduledir": executor.moduleDir,
@@ -232,11 +217,14 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) ([]string, err
 		return nil, err
 	}
 
-	files, err := glob(filepath.Join(executor.repositoryPath, executor.moduleDir), ".coverprofile.1")
+	files, err := glob(filepath.Join(executor.repositoryPath, executor.moduleDir), func(s string) bool {
+		return strings.HasSuffix(s, ".coverprofile.1") || strings.HasSuffix(s, ".coverprofile")
+	})
 	if err != nil {
 		return nil, err
 	}
 
+	logger.Debugf("total: %d", len(files))
 	for _, f := range files {
 		logger.Debugf("%s", f)
 	}
@@ -244,17 +232,29 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) ([]string, err
 	return files, nil
 }
 
-func glob(dir string, ext string) ([]string, error) {
-	files := []string{}
-	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-		if strings.HasSuffix(path, ext) {
-			files = append(files, path)
+func glob(root string, fn func(string) bool) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(s string, d fs.DirEntry, e error) error {
+		if fn(s) {
+			files = append(files, s)
 		}
 		return nil
 	})
-
 	return files, err
 }
+
+// func glob(dir string, ext string) ([]string, error) {
+// 	files := []string{}
+// 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+// 		fmt.Println(path, f.Name())
+// 		if strings.HasSuffix(path, ext) {
+// 			files = append(files, path)
+// 		}
+// 		return nil
+// 	})
+
+// 	return files, err
+// }
 
 func buildGoCover(
 	mode CoverageMode,
