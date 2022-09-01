@@ -217,9 +217,9 @@ func newGoCoverTestCommand() *cobra.Command {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 			defer cancel()
 
-			t, err := gocover.NewGoCoverTest(o)
+			t, err := gocover.NewGoCoverTestExecutor(o)
 			if err != nil {
-				return fmt.Errorf("NewGoCoverTest: %w", err)
+				return fmt.Errorf("NewGoCoverTestExecutor: %w", err)
 			}
 			return t.Run(ctx)
 		},
