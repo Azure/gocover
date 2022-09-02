@@ -94,6 +94,8 @@ type GoCoverTestOption struct {
 	ModulePath     string
 	CoverageMode   CoverageMode
 	ExecutorMode   ExecutorMode
+	GoTestFlags    []string
+	GinkgoFlags    []string
 
 	CoverageBaseline float64
 	ReportFormat     string

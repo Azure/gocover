@@ -253,5 +253,7 @@ func newGoCoverTestCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
 	cmd.Flags().StringVar((*string)(&o.CoverageMode), "coverage-mode", string(gocover.FullCoverage), `mode for coverage, "full" or "diff"`)
 	cmd.Flags().StringVar((*string)(&o.ExecutorMode), "executor-mode", string(gocover.GoExecutor), `unit test mode, "go" or "ginkgo"`)
+	cmd.Flags().StringSliceVar(&o.GoTestFlags, "go-flags", []string{}, "flags for go test")
+	cmd.Flags().StringSliceVar(&o.GinkgoFlags, "ginkgo-flags", []string{}, "flags for ginkgo")
 	return cmd
 }
