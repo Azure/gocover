@@ -204,7 +204,7 @@ func mergeCoverProfiles(outputdir string, coverProfiles []string) (string, error
 
 func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
 	buildString := fmt.Sprintf("%s build -r -cover -coverpkg ./... ./", executor.executable)
-	runString := fmt.Sprintf("%s -p -r -trace -cover -coverpkg ./... ./", executor.executable)
+	runString := fmt.Sprintf("%s -r -trace -cover -coverpkg ./... ./", executor.executable)
 
 	workingDir := filepath.Join(executor.repositoryPath, executor.moduleDir)
 	logger := executor.logger.WithFields(logrus.Fields{
@@ -227,13 +227,13 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
 	logger.Infof("ginkgo tests built sucessfully")
 
 	logger.Infof("executing cmd: %s", runString)
-	runCmd := exec.Command(executor.executable, "-p", "-r", "-trace", "-cover", "-coverpkg", "./...", "./")
+	runCmd := exec.Command(executor.executable, "-r", "-trace", "-cover", "-coverpkg", "./...", "./")
 	runCmd.Dir = workingDir
 	runCmd.Stdin = nil
 	runCmd.Stdout = executor.stdout
 	runCmd.Stderr = executor.stderr
 	if err := runCmd.Run(); err != nil {
-		err = fmt.Errorf(`executing cmd %s failed: %w`, buildString, err)
+		err = fmt.Errorf(`executing cmd: %s failed: %w`, runString, err)
 		logger.WithError(err).Error()
 		return err
 	}

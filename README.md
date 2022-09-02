@@ -63,7 +63,7 @@ gocover full --repository-path=${REPO ROOT PATH} --cover-profile=${PATH TO}cover
 Use following command to run the unit tests and get coverage on the module.
 The cover profiles and coverage result are written in the output directory.
 
-* `--executor-mode`, what test framework to run the unit tests. `go` uses `go test ./... -coverpkg=./...`, `ginkgo` uses `-p -r -trace -cover -coverpkg ./... ./` to run the unit tests.
+* `--executor-mode`, what test framework to run the unit tests. `go` uses `go test ./... -coverpkg=./...`, `ginkgo` uses `ginkgo -r -trace -cover -coverpkg ./... ./` to run the unit tests.
 
 ```bash
 gocover test --repository-path=${REPO ROOT PATH} --coverage-mode [full|diff] --executor-mode [go|ginkgo] --outputdir /tmp
