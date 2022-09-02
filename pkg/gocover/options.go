@@ -72,13 +72,18 @@ func (o *DiffOption) Validate() error {
 }
 
 type CoverageMode string
+type ExecutorMode string
 
 const (
 	FullCoverage CoverageMode = "full"
 	DiffCoverage CoverageMode = "diff"
+
+	GoExecutor     ExecutorMode = "go"
+	GinkgoExecutor ExecutorMode = "ginkgo"
 )
 
 var ErrUnknownCoverageMode = errors.New("unknown coverage mode")
+var ErrUnknownExecutorMode = errors.New("unknown executor mode")
 
 // GoCoverTestOption contains the input to the gocover govtest command.
 type GoCoverTestOption struct {
@@ -88,6 +93,7 @@ type GoCoverTestOption struct {
 	ModuleDir      string
 	ModulePath     string
 	CoverageMode   CoverageMode
+	ExecutorMode   ExecutorMode
 
 	CoverageBaseline float64
 	ReportFormat     string
