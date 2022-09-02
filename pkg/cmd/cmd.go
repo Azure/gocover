@@ -111,6 +111,22 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
 	cmd.AddCommand(newGoCoverTestCommand())
+	cmd.AddCommand(newVersionCommand())
+	return cmd
+}
+
+const VERSION = "1.0.0"
+
+func newVersionCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "version",
+		Short:   "print Gocover's version",
+		Example: "gocover version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Fprintf(cmd.OutOrStdout(), "Gocover Version %s\n", VERSION)
+			return nil
+		},
+	}
 	return cmd
 }
 
@@ -236,5 +252,6 @@ func newGoCoverTestCommand() *cobra.Command {
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
 	cmd.Flags().StringVar((*string)(&o.CoverageMode), "coverage-mode", string(gocover.FullCoverage), `mode for coverage, "full" or "diff"`)
+	cmd.Flags().StringVar((*string)(&o.ExecutorMode), "executor-mode", string(gocover.GoExecutor), `unit test mode, "go" or "ginkgo"`)
 	return cmd
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,7 +16,7 @@ import (
 )
 
 const (
-	GinkgoEnabledEnvKey = "GINKGO_MODE"
+	outCoverageProfile = "coverage.out"
 )
 
 type GoCoverTestExecutor interface {
@@ -31,30 +30,15 @@ func NewGoCoverTestExecutor(o *GoCoverTestOption) (GoCoverTestExecutor, error) {
 	}
 
 	if o.OutputDir == "" {
-		tmpDir, err := ioutil.TempDir("", "gocover")
+		dir, err := createGoCoverTempDirectory()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("create gocover temp directory: %w", err)
 		}
-		o.OutputDir = tmpDir
+		o.OutputDir = dir
 	}
 
-	if err := os.MkdirAll(o.OutputDir, fs.ModePerm); err != nil {
-		return nil, fmt.Errorf("create output directory %s: %w", o.OutputDir, err)
-	}
-
-	if os.Getenv(GinkgoEnabledEnvKey) != "" {
-		return &ginkgoTestExecutor{
-			repositoryPath: repositoryAbsPath,
-			moduleDir:      o.ModuleDir,
-			outputDir:      o.OutputDir,
-			stdout:         o.StdOut,
-			stderr:         o.StdErr,
-			executable:     ginkgoCmd(),
-			logger:         o.Logger.WithField("source", "GoCoverTest"),
-			mode:           o.CoverageMode,
-			option:         o,
-		}, nil
-	} else {
+	switch o.ExecutorMode {
+	case GoExecutor:
 		return &goBuiltInTestExecutor{
 			repositoryPath: repositoryAbsPath,
 			moduleDir:      o.ModuleDir,
@@ -66,6 +50,21 @@ func NewGoCoverTestExecutor(o *GoCoverTestOption) (GoCoverTestExecutor, error) {
 			mode:           o.CoverageMode,
 			option:         o,
 		}, nil
+	case GinkgoExecutor:
+
+		return &ginkgoTestExecutor{
+			repositoryPath: repositoryAbsPath,
+			moduleDir:      o.ModuleDir,
+			outputDir:      o.OutputDir,
+			stdout:         o.StdOut,
+			stderr:         o.StdErr,
+			executable:     ginkgoCmd(),
+			logger:         o.Logger.WithField("source", "GoCoverTest"),
+			mode:           o.CoverageMode,
+			option:         o,
+		}, nil
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrUnknownExecutorMode, o.ExecutorMode)
 	}
 }
 
@@ -92,16 +91,18 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 		},
 	)
 
-	coverFile := filepath.Join(t.outputDir, "coverage.out")
+	coverFile := filepath.Join(t.outputDir, outCoverageProfile)
+	testString := fmt.Sprintf("go test ./... -coverprofile %s -coverpkg=./... -v", coverFile)
+
 	cmd := exec.Command(t.executable, "test", "./...", "-coverprofile", coverFile, "-coverpkg=./...", "-v")
 	cmd.Dir = filepath.Join(t.repositoryPath, t.moduleDir)
 	cmd.Stdin = nil
 	cmd.Stdout = t.stdout
 	cmd.Stderr = t.stderr
 
-	logger.Infof("run unit test: 'go test ./... -coverprofile %s -coverpkg=./... -v'", coverFile)
+	logger.Infof("run unit tests: '%s'", testString)
 	if err := cmd.Run(); err != nil {
-		err = fmt.Errorf(`run unit test 'go test ./... -coverprofile %s -coverpkg=./... -v' failed: %w`, coverFile, err)
+		err = fmt.Errorf(`run unit test '%s' failed: %w`, testString, err)
 		t.logger.WithError(err).Error()
 		return err
 	}
@@ -113,6 +114,7 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 
 	logger.Info("run unit test succeeded")
 	logger.Infof("cover profile: %s", coverFile)
+
 	if err := gocover.Run(ctx); err != nil {
 		err := fmt.Errorf("run gocover: %w", err)
 		logger.WithError(err).Error()
@@ -134,39 +136,32 @@ type ginkgoTestExecutor struct {
 }
 
 func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
-	coverFiles, err := e.runTests(ctx)
+	err := e.runTests(ctx)
+	if err != nil {
+		return fmt.Errorf("run tests: %w", err)
+	}
+
+	coverFiles, err := findCoverProfiles(filepath.Join(e.repositoryPath, e.moduleDir))
 	if err != nil {
 		return err
 	}
 
-	one := filepath.Join(e.outputDir, "cover.out")
-	f, err := os.Create(one)
+	e.logger.Debugf("total: %d", len(coverFiles))
+	for _, f := range coverFiles {
+		e.logger.Debugf("%s", f)
+	}
+
+	mergedFile, err := mergeCoverProfiles(e.outputDir, coverFiles)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("merge cover profiles: %w", err)
 	}
-	fmt.Fprint(f, "mode: atomic\n")
 
-	for _, c := range coverFiles {
-		pf, err := os.Open(c)
-		if err != nil {
-			panic(err)
-		}
-		s := bufio.NewScanner(pf)
-		s.Scan()
-		for s.Scan() {
-			fmt.Fprintf(f, "%s\n", s.Text())
-		}
-		pf.Close()
-	}
-	f.Close()
-
-	gocover, err := buildGoCover(e.mode, e.option, []string{one}, e.logger)
+	gocover, err := buildGoCover(e.mode, e.option, []string{mergedFile}, e.logger)
 	if err != nil {
 		return err
 	}
 
-	e.logger.Info("run unit test succeeded")
-	e.logger.Infof("cover profile: %s", coverFiles)
+	e.logger.Infof("cover profiles: %s", coverFiles)
 	if err := gocover.Run(ctx); err != nil {
 		err := fmt.Errorf("run gocover: %w", err)
 		e.logger.WithError(err).Error()
@@ -174,87 +169,124 @@ func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 	}
 
 	for _, f := range coverFiles {
-		_, name := filepath.Split(f)
-		e.logger.Debugf("move %s to %s", f, filepath.Join(e.outputDir, name))
-		if err := os.Rename(f, filepath.Join(e.outputDir, name)); err != nil {
-			e.logger.Error(err)
-		}
+		e.logger.Debugf("clean file: %s", f)
+		_ = os.Remove(f)
 	}
 
 	return nil
 }
 
-func (executor *ginkgoTestExecutor) runTests(ctx context.Context) ([]string, error) {
-	logger := executor.logger.WithFields(
-		logrus.Fields{
-			"moduledir": executor.moduleDir,
-			"executor":  "ginkgo",
-		},
-	)
+func mergeCoverProfiles(outputdir string, coverProfiles []string) (string, error) {
+	result := filepath.Join(outputdir, outCoverageProfile)
+	f, err := os.Create(result)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
 
-	logger.Debugf("executing cmd: %s build -r -cover -coverpkg ./... ./", executor.executable)
+	fmt.Fprint(f, "mode: atomic\n")
+	for _, c := range coverProfiles {
+		pf, err := os.Open(c)
+		if err != nil {
+			return "", err
+		}
+		s := bufio.NewScanner(pf)
+
+		s.Scan() // skip first line of cover profile because it's cover profile's metadata
+		for s.Scan() {
+			fmt.Fprintf(f, "%s\n", s.Text())
+		}
+		pf.Close()
+	}
+
+	return result, nil
+}
+
+func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
+	buildString := fmt.Sprintf("%s build -r -cover -coverpkg ./... ./", executor.executable)
+	runString := fmt.Sprintf("%s -p -r -trace -cover -coverpkg ./... ./", executor.executable)
+
+	workingDir := filepath.Join(executor.repositoryPath, executor.moduleDir)
+	logger := executor.logger.WithFields(logrus.Fields{
+		"moduledir":  executor.moduleDir,
+		"workingdir": workingDir,
+		"executor":   "ginkgo",
+	})
+
+	logger.Infof("executing cmd: %s", buildString)
 	buildCmd := exec.Command(executor.executable, "build", "-r", "-cover", "-coverpkg", "./...", "./")
-	buildCmd.Dir = filepath.Join(executor.repositoryPath, executor.moduleDir)
+	buildCmd.Dir = workingDir
 	buildCmd.Stdin = nil
 	buildCmd.Stdout = executor.stdout
 	buildCmd.Stderr = executor.stderr
 	if err := buildCmd.Run(); err != nil {
-		err = fmt.Errorf(`executing cmd '%s build -r -cover -coverpkg ./... ./' failed: %w`, executor.executable, err)
+		err = fmt.Errorf(`executing cmd %s failed: %w`, buildString, err)
 		logger.WithError(err).Error()
-		return nil, err
+		return err
 	}
-	logger.Debug("tests built sucessfully")
+	logger.Infof("ginkgo tests built sucessfully")
 
-	logger.Debugf("executing cmd: %s -p -r -trace -cover -coverpkg ./... ./", executor.executable)
+	logger.Infof("executing cmd: %s", runString)
 	runCmd := exec.Command(executor.executable, "-p", "-r", "-trace", "-cover", "-coverpkg", "./...", "./")
-	runCmd.Dir = filepath.Join(executor.repositoryPath, executor.moduleDir)
+	runCmd.Dir = workingDir
 	runCmd.Stdin = nil
 	runCmd.Stdout = executor.stdout
 	runCmd.Stderr = executor.stderr
 	if err := runCmd.Run(); err != nil {
-		err = fmt.Errorf(`executing cmd '%s -r -trace -cover -coverpkg ./... ./' failed: %w`, executor.executable, err)
+		err = fmt.Errorf(`executing cmd %s failed: %w`, buildString, err)
 		logger.WithError(err).Error()
-		return nil, err
+		return err
 	}
+	logger.Info("ginkgo tests run sucessfully")
 
-	files, err := glob(filepath.Join(executor.repositoryPath, executor.moduleDir), func(s string) bool {
+	return nil
+}
+
+func findCoverProfiles(dir string) ([]string, error) {
+	files, err := glob(dir, func(s string) bool {
+		// ginkgo generates cover profile file ends with ".coverprofile.1" or ".coverprofile"
 		return strings.HasSuffix(s, ".coverprofile.1") || strings.HasSuffix(s, ".coverprofile")
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	logger.Debugf("total: %d", len(files))
-	for _, f := range files {
-		logger.Debugf("%s", f)
-	}
-
 	return files, nil
 }
 
 func glob(root string, fn func(string) bool) ([]string, error) {
 	var files []string
-	err := filepath.WalkDir(root, func(s string, d fs.DirEntry, e error) error {
-		if fn(s) {
-			files = append(files, s)
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, e error) error {
+		if fn(path) {
+			files = append(files, path)
 		}
 		return nil
 	})
 	return files, err
 }
 
-// func glob(dir string, ext string) ([]string, error) {
-// 	files := []string{}
-// 	err := filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
-// 		fmt.Println(path, f.Name())
-// 		if strings.HasSuffix(path, ext) {
-// 			files = append(files, path)
-// 		}
-// 		return nil
-// 	})
+func goCmd() string {
+	var exeSuffix string
+	if runtime.GOOS == "windows" {
+		exeSuffix = ".exe"
+	}
+	path := filepath.Join(runtime.GOROOT(), "bin", "go"+exeSuffix)
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	return "go"
+}
 
-// 	return files, err
-// }
+func ginkgoCmd() string {
+	var exeSuffix string
+	if runtime.GOOS == "windows" {
+		exeSuffix = ".exe"
+	}
+	path := filepath.Join(os.Getenv("GOPATH"), "bin", "go"+exeSuffix)
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	return "ginkgo"
+}
 
 func buildGoCover(
 	mode CoverageMode,
@@ -296,28 +328,4 @@ func buildGoCover(
 	default:
 		return nil, ErrUnknownCoverageMode
 	}
-}
-
-func goCmd() string {
-	var exeSuffix string
-	if runtime.GOOS == "windows" {
-		exeSuffix = ".exe"
-	}
-	path := filepath.Join(runtime.GOROOT(), "bin", "go"+exeSuffix)
-	if _, err := os.Stat(path); err == nil {
-		return path
-	}
-	return "go"
-}
-
-func ginkgoCmd() string {
-	var exeSuffix string
-	if runtime.GOOS == "windows" {
-		exeSuffix = ".exe"
-	}
-	path := filepath.Join(os.Getenv("GOPATH"), "bin", "go"+exeSuffix)
-	if _, err := os.Stat(path); err == nil {
-		return path
-	}
-	return "ginkgo"
 }

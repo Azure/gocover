@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -108,4 +109,16 @@ func parseGoModulePath(goModDir string) (string, error) {
 	}
 
 	return result, nil
+}
+
+func createGoCoverTempDirectory() (string, error) {
+	tmpDir, err := ioutil.TempDir("", "gocover")
+	if err != nil {
+		return "", err
+	}
+
+	if err := os.MkdirAll(tmpDir, fs.ModePerm); err != nil {
+		return "", err
+	}
+	return tmpDir, nil
 }
