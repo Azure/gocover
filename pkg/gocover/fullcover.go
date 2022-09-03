@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/build"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/Azure/gocover/pkg/dbclient"
@@ -43,22 +42,15 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		return nil, fmt.Errorf("parse go module path: %w", err)
 	}
 
-	var excludesRegexps []*regexp.Regexp
-	for _, ignorePattern := range o.Excludes {
-		reg, err := regexp.Compile(ignorePattern)
-		if err != nil {
-			return nil, fmt.Errorf("compile ignore pattern %s: %w", ignorePattern, err)
-		}
-		excludesRegexps = append(excludesRegexps, reg)
-	}
-
-	logger.Debugf("repository path: %s, module path: %s, output dir: %s", repositoryAbsPath, modulePath, o.OutputDir)
+	logger.Debugf("repository path: %s, module path: %s, output dir: %s, exclude patterns: %s",
+		repositoryAbsPath, modulePath, o.OutputDir, o.Excludes)
 
 	return &fullCover{
 		coverFilenames:  o.CoverProfiles,
 		modulePath:      modulePath,
 		repositoryPath:  repositoryAbsPath,
-		excludesRegexps: excludesRegexps,
+		excludeFiles:    make(excludeFileCache),
+		excludePatterns: o.Excludes,
 		moduleDir:       o.ModuleDir,
 		coverageTree:    report.NewCoverageTree(modulePath),
 		logger:          logger,
@@ -70,12 +62,14 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 
 var _ GoCover = (*fullCover)(nil)
 
+// diffCoverage implements the GoCover interface and generate the full coverage statistics.
 type fullCover struct {
 	coverFilenames  []string
 	moduleDir       string
 	modulePath      string
 	repositoryPath  string
-	excludesRegexps []*regexp.Regexp
+	excludePatterns []string
+	excludeFiles    excludeFileCache
 	coverageTree    report.CoverageTree
 	reportGenerator report.ReportGenerator
 	dbClient        dbclient.DbClient
@@ -136,11 +130,20 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 
 		for _, fun := range pkg.Functions {
 
+			if ok := inExclueds(
+				full.excludeFiles,
+				full.excludePatterns,
+				formatFilePath(p.Root, fun.File, full.modulePath),
+				full.logger,
+			); ok {
+				continue
+			}
+
 			// extract into single function
 			coverProfile, ok := m[fun.File]
 			if !ok {
 				coverProfile = &report.CoverageProfile{
-					FileName: filepath.Join(full.modulePath, strings.TrimPrefix(fun.File, p.Root)),
+					FileName: formatFilePath(p.Root, fun.File, full.modulePath),
 				}
 				m[fun.File] = coverProfile
 				statistics.CoverageProfile = append(statistics.CoverageProfile, coverProfile)
@@ -201,17 +204,7 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 
 	full.coverageTree.CollectCoverageData()
 
-	for _, p := range statistics.CoverageProfile {
-		statistics.TotalLines += p.TotalLines
-		statistics.TotalCoveredLines += p.CoveredLines
-		statistics.TotalEffectiveLines += p.TotalEffectiveLines
-		statistics.TotalIgnoredLines += p.TotalIgnoredLines
-	}
-
-	statistics.TotalCoveragePercent = calculateCoverage(
-		int64(statistics.TotalCoveredLines),
-		int64(statistics.TotalEffectiveLines),
-	)
+	reBuildStatistics(statistics, full.excludeFiles)
 
 	return statistics, nil
 }

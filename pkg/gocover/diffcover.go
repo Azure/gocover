@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/build"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/Azure/gocover/pkg/dbclient"
@@ -44,24 +43,17 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 		return nil, fmt.Errorf("parse go module path: %w", err)
 	}
 
-	var excludesRegexps []*regexp.Regexp
-	for _, ignorePattern := range o.Excludes {
-		reg, err := regexp.Compile(ignorePattern)
-		if err != nil {
-			return nil, fmt.Errorf("compile ignore pattern %s: %w", ignorePattern, err)
-		}
-		excludesRegexps = append(excludesRegexps, reg)
-	}
-
-	logger.Debugf("repository path: %s, module path: %s, output dir: %s", repositoryAbsPath, modulePath, o.OutputDir)
+	logger.Debugf("repository path: %s, module path: %s, output dir: %s, exclude patterns: %s",
+		repositoryAbsPath, modulePath, o.OutputDir, o.Excludes)
 
 	return &diffCover{
+		repositoryPath:   repositoryAbsPath,
 		comparedBranch:   o.CompareBranch,
 		moduleDir:        o.ModuleDir,
 		modulePath:       modulePath,
-		excludesRegexps:  excludesRegexps,
+		excludeFiles:     make(excludeFileCache),
+		excludePatterns:  o.Excludes,
 		coverageTree:     report.NewCoverageTree(modulePath),
-		repositoryPath:   repositoryAbsPath,
 		coverFilenames:   o.CoverProfiles,
 		coverageBaseline: o.CoverageBaseline,
 		dbClient:         dbClient,
@@ -73,12 +65,12 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 
 var _ GoCover = (*diffCover)(nil)
 
-// diffCoverage implements the DiffCoverage interface
-// and generate the diff coverage statistics
+// diffCoverage implements the GoCover interface and generate the diff coverage statistics.
 type diffCover struct {
-	comparedBranch   string           // git diff base branch
-	excludesRegexps  []*regexp.Regexp // excludes files regexp patterns
+	comparedBranch   string // git diff base branch
 	repositoryPath   string
+	excludePatterns  []string
+	excludeFiles     excludeFileCache
 	moduleDir        string
 	modulePath       string
 	coverFilenames   []string
@@ -182,7 +174,7 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 			coverProfile, ok := m[fun.File]
 			if !ok {
 				coverProfile = &report.CoverageProfile{
-					FileName: filepath.Join(diff.modulePath, strings.TrimPrefix(fun.File, p.Root)),
+					FileName: formatFilePath(p.Root, fun.File, diff.modulePath),
 				}
 				m[fun.File] = coverProfile
 			}
@@ -227,11 +219,20 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 			}
 
 			if changed {
+
+				if ok := inExclueds(
+					diff.excludeFiles,
+					diff.excludePatterns,
+					formatFilePath(p.Root, fun.File, diff.modulePath),
+					diff.logger,
+				); ok {
+					continue
+				}
+
 				coverProfile.TotalLines += total
 				coverProfile.CoveredLines += covered
 				coverProfile.TotalEffectiveLines += (total - ignored)
 				coverProfile.TotalIgnoredLines += ignored
-				// coverProfile.TotalViolationLines = append(coverProfile.TotalViolationLines, section.ViolationLines...)
 				if violated {
 					coverProfile.ViolationSections = append(coverProfile.ViolationSections, section)
 				}
@@ -255,17 +256,7 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 
 	diff.coverageTree.CollectCoverageData()
 
-	for _, p := range statistics.CoverageProfile {
-		statistics.TotalLines += p.TotalLines
-		statistics.TotalCoveredLines += p.CoveredLines
-		statistics.TotalEffectiveLines += p.TotalEffectiveLines
-		statistics.TotalIgnoredLines += p.TotalIgnoredLines
-	}
-
-	statistics.TotalCoveragePercent = calculateCoverage(
-		int64(statistics.TotalCoveredLines),
-		int64(statistics.TotalEffectiveLines),
-	)
+	reBuildStatistics(statistics, diff.excludeFiles)
 
 	return statistics, nil
 }

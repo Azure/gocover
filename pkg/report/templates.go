@@ -35,74 +35,83 @@ var htmlCoverageReport = "" +
     {{ end }}
 
     {{ if .CoverageProfile }}
-    <ul>
-        <li>
-            <b>Total</b>: {{ NormalizeLines .TotalLines }}
-        </li>
-        <li>
-            <b>Effective</b>: {{ NormalizeLines .TotalEffectiveLines }}
-        </li>
-        <li>
-            <b>Covered</b>: {{ NormalizeLines .TotalCoveredLines }}
-        </li>
-        <li>
-            <b>Ignored</b>: {{ NormalizeLines .TotalIgnoredLines }}
-        </li>
-        <li>
-            <b>Coverage</b>: {{ .TotalCoveragePercent }}%
-        </li>
-    </ul>
+        <ul>
+            <li>
+                <b>Total</b>: {{ NormalizeLines .TotalLines }}
+            </li>
+            <li>
+                <b>Effective</b>: {{ NormalizeLines .TotalEffectiveLines }}
+            </li>
+            <li>
+                <b>Covered</b>: {{ NormalizeLines .TotalCoveredLines }}
+            </li>
+            <li>
+                <b>Ignored</b>: {{ NormalizeLines .TotalIgnoredLines }}
+            </li>
+            <li>
+                <b>Coverage</b>: {{ .TotalCoveragePercent }}%
+            </li>
+        </ul>
 
-    <p>
-        <b>Coverage</b> = Covered / Effective <br />
-        <b>Total</b> = Effective + Ignored
-    </p>
+        <p>
+            <b>Coverage</b> = Covered / Effective <br />
+            <b>Total</b> = Effective + Ignored
+        </p>
 
-    <table border="1">
-        <thead>
-            <tr>
-                <th>Source File</th>
-                {{ if IsFullCoverageReport .StatisticsType }}
-                    <th>Full Coverage (%)</th>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Source File</th>
+                    {{ if IsFullCoverageReport .StatisticsType }}
+                        <th>Full Coverage (%)</th>
+                    {{ end }}
+                    {{ if IsDiffCoverageReport .StatisticsType }}
+                        <th>Diff Coverage (%)</th>
+                    {{ end }}
+                    <th>Covered Lines</th>
+                    <th>Ignored Lines</th>
+                    <th>Effective Lines</th>
+                    <th>Total Lines</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .CoverageProfile }}
+                <tr>
+                    <td>{{ .FileName }}</td>
+                    <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines }}</td>
+                    <td>{{ .CoveredLines }}</td>
+                    <td>{{ .TotalIgnoredLines }}</td>
+                    <td>{{ .TotalEffectiveLines }}</td>
+                    <td>{{ .TotalLines }}</td>
+                </tr>
                 {{ end }}
-                {{ if IsDiffCoverageReport .StatisticsType }}
-                    <th>Diff Coverage (%)</th>
-                {{ end }}
-                <th>Covered Lines</th>
-                <th>Ignored Lines</th>
-                <th>Effective Lines</th>
-                <th>Total Lines</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{ range .CoverageProfile }}
-            <tr>
-                <td>{{ .FileName }}</td>
-                <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines }}</td>
-                <td>{{ .CoveredLines }}</td>
-                <td>{{ .TotalIgnoredLines }}</td>
-                <td>{{ .TotalEffectiveLines }}</td>
-                <td>{{ .TotalLines }}</td>
-            </tr>
-            {{ end }}
-        </tbody>
-    </table>
+            </tbody>
+        </table>
 
-    {{ range .CoverageProfile }}
-    <div class="src-snippet">
-        {{ if lt (PercentCovered .TotalEffectiveLines .CoveredLines) 100.0 }}
-        <div class="src-name">{{ .FileName }}</div>
-        <div class="snippets">
-            {{range .CodeSnippet}}
-            {{ . }}
-            {{ end }}
-        </div>
+        {{ range .CoverageProfile }}
+            <div class="src-snippet">
+                {{ if lt (PercentCovered .TotalEffectiveLines .CoveredLines) 100.0 }}
+                <div class="src-name">{{ .FileName }}</div>
+                <div class="snippets">
+                    {{range .CodeSnippet}}
+                    {{ . }}
+                    {{ end }}
+                </div>
+                {{ end }}
+            </div>
         {{ end }}
-    </div>
-    {{ end }}
 
     {{ else }}
-    <p>No lines with coverage information in this diff.</p>
+        <p>No lines with coverage information in this diff.</p>
+    {{ end }}
+
+    {{ if .ExcludeFiles }}
+        <h3>Exclude Files</h3>
+        <ul>
+        {{ range .ExcludeFiles }}
+            <li>{{ . }}</li>
+        {{ end }}
+        </ul>
     {{ end }}
 
 </body>

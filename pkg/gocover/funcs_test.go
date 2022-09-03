@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/report"
+	"github.com/sirupsen/logrus"
 )
 
 func TestCalculateCoverage(t *testing.T) {
@@ -32,6 +34,94 @@ func TestCalculateCoverage(t *testing.T) {
 			if actual != testCase.expect {
 				t.Errorf("expect calculateCoverage(%d, %d) = %f, but get %f", testCase.covered, testCase.effectived, testCase.expect, actual)
 			}
+		}
+	})
+}
+
+func TestInExclueds(t *testing.T) {
+	t.Run("inExclueds", func(t *testing.T) {
+		cache := make(excludeFileCache)
+		logger := logrus.New()
+		testSuites := []struct {
+			input  string
+			expect bool
+		}{
+			{input: "github.com/Azure/gocover/pkg/mock_client/interface.go", expect: true}, // first match
+			{input: "github.com/Azure/gocover/pkg/mock_client/interface.go", expect: true}, // second match, hit cache
+			{input: "github.com/Azure/gocover/pkg/mock_client/dbclient.go", expect: true},
+			{input: "/mock_client/dbclient.go", expect: true},
+			{input: "mock_client/dbclient.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/client/dbclient.go", expect: false},
+		}
+
+		for _, testCase := range testSuites {
+			acutal := inExclueds(cache, []string{"**/mock_*/**"}, testCase.input, logger)
+			// only care about linux os
+			if runtime.GOOS == "linux" {
+				if acutal != testCase.expect {
+					t.Errorf("expcet %t, but get %t", testCase.expect, acutal)
+				}
+			}
+		}
+	})
+}
+
+func TestFormatFilePath(t *testing.T) {
+	t.Run("formatFilePath", func(t *testing.T) {
+		testSuites := []struct {
+			input  string
+			expect string
+		}{
+			{input: "/home/user/go/src/Azure/gocover/pkg/foo/foo.go", expect: "github.com/Azure/gocover/pkg/foo/foo.go"},
+			{input: "/src/pkg/foo/foo.go", expect: "github.com/Azure/gocover/src/pkg/foo/foo.go"},
+		}
+
+		for _, testCase := range testSuites {
+			acutal := formatFilePath("/home/user/go/src/Azure/gocover", testCase.input, "github.com/Azure/gocover")
+			// only care about linux os
+			if runtime.GOOS == "linux" {
+				if acutal != testCase.expect {
+					t.Errorf("expcet %s, but get %s", testCase.expect, acutal)
+				}
+			}
+		}
+	})
+}
+
+func TestReBuildStatistics(t *testing.T) {
+	t.Run("reBuildStatistics", func(t *testing.T) {
+		s := &report.Statistics{
+			CoverageProfile: []*report.CoverageProfile{
+				{TotalLines: 50, CoveredLines: 30, TotalEffectiveLines: 40, TotalIgnoredLines: 10},
+				{TotalLines: 50, CoveredLines: 15, TotalEffectiveLines: 50, TotalIgnoredLines: 0},
+			},
+		}
+		cache := excludeFileCache{"github.com/Azure/gocover/pkg/foo/foo.go": true}
+		reBuildStatistics(s, cache)
+
+		expectCveragePercent := calculateCoverage(30+15, 40+50)
+		if s.TotalCoveragePercent != expectCveragePercent {
+			t.Errorf("expect coverage percent %f, but get %f", expectCveragePercent, s.TotalCoveragePercent)
+		}
+		expectTotal := 50 + 50
+		if s.TotalLines != expectTotal {
+			t.Errorf("expect total %d, but get %d", expectTotal, s.TotalLines)
+		}
+		expectTotalCover := 30 + 15
+		if s.TotalCoveredLines != expectTotalCover {
+			t.Errorf("expect total covered %d, but get %d", expectTotalCover, s.TotalCoveredLines)
+		}
+		expectTotalEffective := 40 + 50
+		if s.TotalEffectiveLines != expectTotalEffective {
+			t.Errorf("expect effectived %d, but get %d", expectTotalEffective, s.TotalEffectiveLines)
+		}
+		expectTotalIgnore := 10 + 0
+		if s.TotalIgnoredLines != expectTotalIgnore {
+			t.Errorf("expect ignored %d, but get %d", expectTotalIgnore, s.TotalIgnoredLines)
+		}
+
+		if len(cache) != len(s.ExcludeFiles) {
+			t.Errorf("should have %d exclude file, but get %d", len(cache), len(s.ExcludeFiles))
 		}
 	})
 }

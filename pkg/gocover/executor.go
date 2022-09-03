@@ -161,7 +161,7 @@ func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 		return err
 	}
 
-	e.logger.Infof("cover profiles: %s", coverFiles)
+	e.logger.Infof("cover profile: %s", mergedFile)
 	if err := gocover.Run(ctx); err != nil {
 		err := fmt.Errorf("run gocover: %w", err)
 		e.logger.WithError(err).Error()

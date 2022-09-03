@@ -6,6 +6,7 @@ require (
 	github.com/Azure/azure-kusto-go v0.7.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
 	github.com/alecthomas/chroma/v2 v2.2.0
+	github.com/bmatcuk/doublestar/v4 v4.2.0
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.5.0
