@@ -32,6 +32,8 @@ type Statistics struct {
 	CoverageProfile []*CoverageProfile
 	// StatisticsType indicates which type the Statistics is.
 	StatisticsType StatisticsType
+	// exclude files that won't take participate to coverage calculation.
+	ExcludeFiles []string
 }
 
 // CoverageProfile represents the test coverage information for a file.

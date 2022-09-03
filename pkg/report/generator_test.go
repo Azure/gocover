@@ -44,10 +44,10 @@ func TestGenerateReport(t *testing.T) {
 
 		reportString := string(data)
 		if !strings.Contains(reportString, "No lines with coverage information in this diff.") {
-			t.Error("report should contains empty diff information")
+			t.Error("report should contain empty diff information")
 		}
 		if !strings.Contains(reportString, "origin/master") {
-			t.Error("report should contains compared branch 'origin/master'")
+			t.Error("report should contain compared branch 'origin/master'")
 		}
 	})
 
@@ -63,6 +63,7 @@ func TestGenerateReport(t *testing.T) {
 			TotalIgnoredLines:    2,
 			TotalViolationLines:  2,
 			TotalCoveragePercent: 70,
+			ExcludeFiles:         []string{"exclude.txt"},
 			CoverageProfile: []*CoverageProfile{
 				{
 					FileName:            "foo.txt",
@@ -118,6 +119,9 @@ func TestGenerateReport(t *testing.T) {
 		}
 		if !strings.Contains(string(data), "Diff Coverage") {
 			t.Error("report header should contain 'Diff Coverage'")
+		}
+		if !strings.Contains(string(data), "Exclude Files") {
+			t.Error("report should contain 'Exclude Files' header")
 		}
 		for _, v := range []string{"foo", "bar", "zoo", "text1", "text2", "text3", "foo.txt", "bar.txt"} {
 			if !strings.Contains(reportString, v) {
