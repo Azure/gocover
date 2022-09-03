@@ -41,6 +41,7 @@ func NewGoCoverTestExecutor(o *GoCoverTestOption) (GoCoverTestExecutor, error) {
 	case GoExecutor:
 		return &goBuiltInTestExecutor{
 			repositoryPath: repositoryAbsPath,
+			flags:          o.GoFlags,
 			moduleDir:      o.ModuleDir,
 			outputDir:      o.OutputDir,
 			executable:     goCmd(),
@@ -54,6 +55,7 @@ func NewGoCoverTestExecutor(o *GoCoverTestOption) (GoCoverTestExecutor, error) {
 
 		return &ginkgoTestExecutor{
 			repositoryPath: repositoryAbsPath,
+			flags:          o.GinkgoFlags,
 			moduleDir:      o.ModuleDir,
 			outputDir:      o.OutputDir,
 			stdout:         o.StdOut,
@@ -75,6 +77,7 @@ type goBuiltInTestExecutor struct {
 	repositoryPath string
 	moduleDir      string
 	mode           CoverageMode
+	flags          []string
 	executable     string
 	outputDir      string
 	option         *GoCoverTestOption
@@ -127,6 +130,7 @@ type ginkgoTestExecutor struct {
 	repositoryPath string
 	moduleDir      string
 	mode           CoverageMode
+	flags          []string
 	executable     string
 	outputDir      string
 	option         *GoCoverTestOption
@@ -203,9 +207,6 @@ func mergeCoverProfiles(outputdir string, coverProfiles []string) (string, error
 }
 
 func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
-	buildString := fmt.Sprintf("%s build -r -cover -coverpkg ./... ./", executor.executable)
-	runString := fmt.Sprintf("%s -p -r -trace -cover -coverpkg ./... ./", executor.executable)
-
 	workingDir := filepath.Join(executor.repositoryPath, executor.moduleDir)
 	logger := executor.logger.WithFields(logrus.Fields{
 		"moduledir":  executor.moduleDir,
@@ -213,8 +214,11 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
 		"executor":   "ginkgo",
 	})
 
+	buildArgs := []string{"build", "-r", "-cover", "-coverpkg=./...", "./"}
+	buildString := fmt.Sprintf("%s %s", executor.executable, strings.Join(buildArgs, " "))
+
 	logger.Infof("executing cmd: %s", buildString)
-	buildCmd := exec.Command(executor.executable, "build", "-r", "-cover", "-coverpkg", "./...", "./")
+	buildCmd := exec.Command(executor.executable, buildArgs...)
 	buildCmd.Dir = workingDir
 	buildCmd.Stdin = nil
 	buildCmd.Stdout = executor.stdout
@@ -226,14 +230,23 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
 	}
 	logger.Infof("ginkgo tests built sucessfully")
 
+	ginkgoFlags := []string{}
+	for _, flag := range executor.flags {
+		if trimmed := strings.TrimSpace(flag); trimmed != "" {
+			ginkgoFlags = append(ginkgoFlags, trimmed)
+		}
+	}
+	ginkgoFlags = append(ginkgoFlags, "./")
+	runString := fmt.Sprintf("%s %s", executor.executable, strings.Join(ginkgoFlags, " "))
+
 	logger.Infof("executing cmd: %s", runString)
-	runCmd := exec.Command(executor.executable, "-p", "-r", "-trace", "-cover", "-coverpkg", "./...", "./")
+	runCmd := exec.Command(executor.executable, ginkgoFlags...)
 	runCmd.Dir = workingDir
 	runCmd.Stdin = nil
 	runCmd.Stdout = executor.stdout
 	runCmd.Stderr = executor.stderr
 	if err := runCmd.Run(); err != nil {
-		err = fmt.Errorf(`executing cmd %s failed: %w`, buildString, err)
+		err = fmt.Errorf(`executing cmd %s failed: %w`, runString, err)
 		logger.WithError(err).Error()
 		return err
 	}
