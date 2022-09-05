@@ -64,11 +64,15 @@ gocover test --coverage-mode full --outputdir /tmp
 `
 )
 
-var dbOption = &dbclient.DBOption{}
+var (
+	dbOption         = &dbclient.DBOption{}
+	timeoutInSeconds int
+)
 
 const (
-	FlagVerbose      = "verbose"
-	FlagVerboseShort = "v"
+	FlagVerbose             = "verbose"
+	FlagVerboseShort        = "v"
+	defaultTimeoutInSeconds = 60 * 60 // 3600 seconds, 1 hour
 )
 
 func createLogger(cmd *cobra.Command) *logrus.Logger {
@@ -107,6 +111,7 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Database, "database", "", "kusto database")
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Event, "event", "", "kusto event")
 	cmd.PersistentFlags().StringSliceVar(&dbOption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
+	cmd.PersistentFlags().IntVar(&timeoutInSeconds, "timeout", defaultTimeoutInSeconds, "execute timeout in seconds")
 
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
@@ -146,7 +151,7 @@ func newDiffCoverageCommand() *cobra.Command {
 				return fmt.Errorf("NewDiffCover: %w", err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutInSeconds*time.Second)
 			defer cancel()
 
 			if err := diff.Run(ctx); err != nil {
@@ -190,7 +195,7 @@ func newFullCoverageCommand() *cobra.Command {
 				return fmt.Errorf("NewFullCover: %w", err)
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutInSeconds*time.Second)
 			defer cancel()
 
 			if err := full.Run(ctx); err != nil {
@@ -230,7 +235,7 @@ func newGoCoverTestCommand() *cobra.Command {
 			o.StdOut = cmd.OutOrStdout()
 			o.StdErr = cmd.ErrOrStderr()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeoutInSeconds*time.Second)
 			defer cancel()
 
 			t, err := gocover.NewGoCoverTestExecutor(o)
