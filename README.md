@@ -146,21 +146,44 @@ func case5(x int) {                                //-|
 
 | Command Options | Definition |
 | --- | --- |
-| —cover-profile | Coverage profile produced by 'go test’ |
-| —repository-path | The root path of repository |
-| —host-path | The host path for the go project |
+| --cover-profile | Coverage profile produced by 'go test’ |
+| --repository-path | The root path of repository |
+| --module-dir | Relative directory to the root repository path that contains `go.mod` file |
+| --timeout | Execute timeout in seconds, default is 3600 |
 
 - Diff Coverage
 
 | Command Options | Definition |
 | --- | --- |
-| —branch-to-compare | branch to compare |
-| —coverage-baseline | The tool will return an error code if coverage is less than coverage baseline(%) |
-| —output | Diff coverage output file |
-| —format | Format of the diff coverage report, one of: html, json, markdown |
-| —excludes | Exclude files for diff coverage inspection |
+| --branch-to-compare | branch to compare |
+| --coverage-baseline | The tool will return an error code if coverage is less than coverage baseline(%) |
+| --output | Diff coverage output file |
+| --format | Format of the diff coverage report, one of: html, json, markdown |
+| --excludes | Exclude files for diff coverage inspection |
 
 ## FAQ
+
+### How to run gocover in a multiple module repository
+1. Change the working directory to the module.
+2. Set `--module-dir` flag to the relative directory of the module
+3. Set `--repository-path` flag to the absolutely path of the repository or a relative path to the working directory.
+
+For example, the directory tree is as following, and the repository path is `/home/user/s`
+```
+.
+├── modulea
+│   └── go.mod
+└── moduleb
+    └── go.mod
+```
+
+So you can run the gocover on `modulea` as following:
+```bash
+cd modulea
+gocover test --repository-path /home/user/s --module-dir modulea 
+# or
+gocover test --repository-path ../ --module-dir modulea 
+```
 
 ### How to calculate diff coverage
 
