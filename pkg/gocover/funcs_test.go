@@ -46,20 +46,30 @@ func TestInExclueds(t *testing.T) {
 			input  string
 			expect bool
 		}{
+			{input: "mock_client/dbclient.go", expect: true},
+			{input: "/mock_client/dbclient.go", expect: true},
 			{input: "github.com/Azure/gocover/pkg/mock_client/interface.go", expect: true}, // first match
 			{input: "github.com/Azure/gocover/pkg/mock_client/interface.go", expect: true}, // second match, hit cache
 			{input: "github.com/Azure/gocover/pkg/mock_client/dbclient.go", expect: true},
-			{input: "/mock_client/dbclient.go", expect: true},
-			{input: "mock_client/dbclient.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/mock_client.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/mock.go", expect: true},
+			{input: "zz_generated.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/api/v1/zz_generated.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/api/v1/zz_generated.deepcopy.go", expect: true},
+			{input: "gocover.pb.go", expect: true},
+			{input: "github.com/Azure/gocover/protos/v1/gocover.pb.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/foo", expect: true},
+			{input: "github.com/Azure/gocover/pkg/foo/foo.go", expect: true},
+			{input: "github.com/Azure/gocover/pkg/foo/a/foo.go", expect: true},
 			{input: "github.com/Azure/gocover/pkg/client/dbclient.go", expect: false},
 		}
 
 		for _, testCase := range testSuites {
-			acutal := inExclueds(cache, []string{"**/mock_*/**"}, testCase.input, logger)
+			acutal := inExclueds(cache, []string{"**/mock_*/**", "**/zz_generated*.go", "**/*.pb.go", "**/mock*.go", "github.com/Azure/gocover/pkg/foo/**"}, testCase.input, logger)
 			// only care about linux os
 			if runtime.GOOS == "linux" {
 				if acutal != testCase.expect {
-					t.Errorf("expcet %t, but get %t", testCase.expect, acutal)
+					t.Errorf("for input %s, expcet %t, but get %t", testCase.input, testCase.expect, acutal)
 				}
 			}
 		}
