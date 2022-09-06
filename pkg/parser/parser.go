@@ -378,7 +378,7 @@ func findState(stmt *StmtExtent, change *gittool.Change) State {
 	}
 
 	for _, s := range change.Sections {
-		for i := s.StartLine; i < s.EndLine; i++ {
+		for i := s.StartLine; i <= s.EndLine; i++ {
 			if stmt.startLine <= i && stmt.endLine >= i {
 				return Changed
 			}
