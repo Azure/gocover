@@ -16,25 +16,25 @@ func TestIgnoreRegexp(t *testing.T) {
 			input  string
 			expect []string
 		}{
-			{input: "//+gocover:ignore:file don't want test this block", expect: []string{"//+gocover:ignore:file don't want test this block", "file", "don't want test this block"}},
-			{input: "// +gocover:ignore:file don't want test this block", expect: []string{"// +gocover:ignore:file don't want test this block", "file", "don't want test this block"}},
-			{input: "//    +gocover:ignore:file don't want test this block", expect: []string{"//    +gocover:ignore:file don't want test this block", "file", "don't want test this block"}},
-			{input: "//	+gocover:ignore:file don't want test this block", expect: []string{"//	+gocover:ignore:file don't want test this block", "file", "don't want test this block"}},
-			{input: "//+gocover:ignore:file some comments", expect: []string{"//+gocover:ignore:file some comments", "file", "some comments"}},
-			{input: "    //+gocover:ignore:file some comments", expect: []string{"    //+gocover:ignore:file some comments", "file", "some comments"}},
-			{input: "	//+gocover:ignore:file some comments", expect: []string{"	//+gocover:ignore:file some comments", "file", "some comments"}},
-			{input: "//+gocover:ignore:block some comments", expect: []string{"//+gocover:ignore:block some comments", "block", "some comments"}},
-			{input: "    //+gocover:ignore:block some comments", expect: []string{"    //+gocover:ignore:block some comments", "block", "some comments"}},
-			{input: "	//+gocover:ignore:block some comments", expect: []string{"	//+gocover:ignore:block some comments", "block", "some comments"}},
-			{input: "  {  //+gocover:ignore:block some comments", expect: []string{"  {  //+gocover:ignore:block some comments", "block", "some comments"}},
-			{input: "  //  //+gocover:ignore:block some comments", expect: []string{"  //  //+gocover:ignore:block some comments", "block", "some comments"}},
-			{input: "//+gocover:ignore:file ", expect: []string{"//+gocover:ignore:file ", "file", ""}},
-			{input: "//+gocover:ignore:file  ", expect: []string{"//+gocover:ignore:file  ", "file", " "}},
-			{input: "//+gocover:ignore:file: ", expect: nil},
-			{input: "//+gocover:ignore:file: comments", expect: nil},
-			{input: "//+gocover:ignore:block", expect: nil},
-			{input: "// +gocover:ignore:block", expect: nil},
-			{input: "// +gocover:ignore:file", expect: nil},
+			{input: "//+gocover:ignore:file don't want test this block", expect: []string{"//+gocover:ignore:file don't want test this block", "file", " ", "don't want test this block"}},
+			{input: "// +gocover:ignore:file don't want test this block", expect: []string{"// +gocover:ignore:file don't want test this block", "file", " ", "don't want test this block"}},
+			{input: "//    +gocover:ignore:file don't want test this block", expect: []string{"//    +gocover:ignore:file don't want test this block", "file", " ", "don't want test this block"}},
+			{input: "//	+gocover:ignore:file don't want test this block", expect: []string{"//	+gocover:ignore:file don't want test this block", "file", " ", "don't want test this block"}},
+			{input: "//+gocover:ignore:file some comments", expect: []string{"//+gocover:ignore:file some comments", "file", " ", "some comments"}},
+			{input: "    //+gocover:ignore:file some comments", expect: []string{"    //+gocover:ignore:file some comments", "file", " ", "some comments"}},
+			{input: "	//+gocover:ignore:file some comments", expect: []string{"	//+gocover:ignore:file some comments", "file", " ", "some comments"}},
+			{input: "//+gocover:ignore:block some comments", expect: []string{"//+gocover:ignore:block some comments", "block", " ", "some comments"}},
+			{input: "    //+gocover:ignore:block some comments", expect: []string{"    //+gocover:ignore:block some comments", "block", " ", "some comments"}},
+			{input: "	//+gocover:ignore:block some comments", expect: []string{"	//+gocover:ignore:block some comments", "block", " ", "some comments"}},
+			{input: "  {  //+gocover:ignore:block some comments", expect: []string{"  {  //+gocover:ignore:block some comments", "block", " ", "some comments"}},
+			{input: "  //  //+gocover:ignore:block some comments", expect: []string{"  //  //+gocover:ignore:block some comments", "block", " ", "some comments"}},
+			{input: "//+gocover:ignore:file ", expect: []string{"//+gocover:ignore:file ", "file", " ", ""}},
+			{input: "//+gocover:ignore:file  ", expect: []string{"//+gocover:ignore:file  ", "file", "  ", ""}},
+			{input: "//+gocover:ignore:file", expect: []string{"//+gocover:ignore:file", "file", "", ""}},
+			{input: "//+gocover:ignore:block", expect: []string{"//+gocover:ignore:block", "block", "", ""}},
+			{input: "// +gocover:ignore:block", expect: []string{"// +gocover:ignore:block", "block", "", ""}},
+			{input: "//+gocover:ignore:file: ", expect: []string{"//+gocover:ignore:file: ", "file", "", ": "}},
+			{input: "//+gocover:ignore:file: comments", expect: []string{"//+gocover:ignore:file: comments", "file", "", ": comments"}},
 			{input: "//+gocover:ignore:abc", expect: nil},
 			{input: "//+gocover:ignore:123", expect: nil},
 			{input: "//+gocover:ignore:", expect: nil},
@@ -43,12 +43,12 @@ func TestIgnoreRegexp(t *testing.T) {
 		for _, testSuite := range testSuites {
 			match := IgnoreRegexp.FindStringSubmatch(testSuite.input)
 			if len(match) != len(testSuite.expect) {
-				t.Errorf("expect %d items, but get %d", len(testSuite.expect), len(match))
+				t.Errorf("for input '%s', expect %d items, but get %d", testSuite.input, len(testSuite.expect), len(match))
 			}
 			n := len(match)
 			for i := 0; i < n; i++ {
 				if match[i] != testSuite.expect[i] {
-					t.Errorf("expect item %d %s, but %s", i, testSuite.expect[i], match[i])
+					t.Errorf("for input '%s', expect item %d %s, but %s", testSuite.input, i, testSuite.expect[i], match[i])
 				}
 			}
 		}
@@ -65,15 +65,18 @@ func TestParseIgnoreAnnotation(t *testing.T) {
 		}{
 			{input: "//+gocover:ignore:file ignore this file!", kind: "file", comments: "ignore this file!", err: nil},
 			{input: "//+gocover:ignore:file  ignore this file! ", kind: "file", comments: "ignore this file!", err: nil},
-			{input: "//+gocover:ignore:block ignore this block!", kind: "block", comments: "ignore this block!", err: nil},
-			{input: "//+gocover:ignore:block  ignore this block! ", kind: "block", comments: "ignore this block!", err: nil},
+			{input: "{ //+gocover:ignore:block ignore this block!", kind: "block", comments: "ignore this block!", err: nil},
+			{input: "{ //+gocover:ignore:block  ignore this block! ", kind: "block", comments: "ignore this block!", err: nil},
 			{input: "//+gocover:ignore:abc ignore this block! ", kind: "", comments: "", err: nil},
 			{input: "//+gocover:ignore:file  ", kind: "", comments: "", err: ErrCommentsRequired},
+			{input: "//+gocover:ignore:file", kind: "", comments: "", err: ErrCommentsRequired},
 			{input: "//+gocover:ignore:block  ", kind: "", comments: "", err: ErrCommentsRequired},
+			{input: "//+gocover:ignore:block", kind: "", comments: "", err: ErrCommentsRequired},
+			{input: "//+gocover:ignore:block:", kind: "", comments: "", err: ErrCommentsRequired},
 		}
 
 		for _, testCase := range testSuites {
-			kind, comments, err := parseIgnoreAnnotation(testCase.input)
+			kind, comments, err := parseIgnoreAnnotation(testCase.input, 10)
 			if kind != testCase.kind {
 				t.Errorf("[%s] expect kind %s, but get %s", testCase.input, testCase.kind, kind)
 			}

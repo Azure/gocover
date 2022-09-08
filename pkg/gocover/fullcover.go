@@ -163,7 +163,6 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 				section.Contents = append(section.Contents, fileContents[i-1])
 			}
 
-			full.logger.Debugf("file path: %s, trimmed: %s", fun.File, strings.TrimPrefix(fun.File, p.Root))
 			node := full.coverageTree.FindOrCreate(strings.TrimPrefix(fun.File, p.Root))
 
 			var total, ignored, covered int

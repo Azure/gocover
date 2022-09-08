@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+
+	"github.com/Azure/gocover/pkg/annotation"
 )
 
 type Package struct {
@@ -38,6 +40,8 @@ type Function struct {
 
 	// statements registered with this function.
 	Statements []*Statement
+
+	IgnoreProfile *annotation.IgnoreProfile
 }
 
 type Statement struct {

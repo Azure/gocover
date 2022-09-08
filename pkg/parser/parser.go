@@ -46,14 +46,12 @@ func (parser *Parser) Parse(changes []*gittool.Change) (*Packages, error) {
 
 		profiles, err := cover.ParseProfiles(coverProfile)
 		if err != nil {
-			err = fmt.Errorf("parse cover profile: %w", err)
-			parser.logger.WithError(err).Error()
+			parser.logger.WithError(err).Error("parse cover profile")
 			return nil, err
 		}
 		for _, p := range profiles {
 			if err := parser.convertProfile(p, findChange(p, changes)); err != nil {
-				err = fmt.Errorf("covert cover profile: %w", err)
-				parser.logger.WithError(err).Error()
+				parser.logger.WithError(err).Error("covert cover profile")
 				return nil, err
 			}
 		}
@@ -75,8 +73,7 @@ type statement struct {
 func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) error {
 	file, pkgpath, err := findFile(parser.packagesCache, p.FileName)
 	if err != nil {
-		err = fmt.Errorf("find file: %w", err)
-		parser.logger.WithError(err).Error()
+		parser.logger.WithError(err).Error("find file")
 		return err
 	}
 	parser.logger.Debugf("[file=%s, pkgPath=%s]", file, pkgpath)
@@ -89,8 +86,7 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 
 	ignoreProfile, err := annotation.ParseIgnoreProfiles(file, p)
 	if err != nil {
-		err = fmt.Errorf("parse ignore profile")
-		parser.logger.WithError(err).Error()
+		parser.logger.WithError(err).Error("parse ignore profile")
 		return err
 	}
 
@@ -100,8 +96,7 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 	// blocks.
 	extents, err := findFuncs(file)
 	if err != nil {
-		err = fmt.Errorf("find Functions: %w", err)
-		parser.logger.WithError(err).Error("")
+		parser.logger.WithError(err).Error("find Functions")
 		return err
 	}
 	var stmts []statement
