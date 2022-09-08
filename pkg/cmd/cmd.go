@@ -30,7 +30,8 @@ gocover diff --cover-profile=coverage.out --compare-branch=origin/master --forma
 	--data-collection-enabled \
 	--endpoint https://your.kusto.windows.net/ \
 	--database kustodb_name \
-	--event kusto_event
+	--coverage-event kusto_event \
+	--ignore-event ignore_event
 `
 
 	fullLong = `Generate coverage for go code unit test.
@@ -50,7 +51,8 @@ gocover full --cover-profile coverage.out --host-path github.com/Azure/gocover \
 	--data-collection-enabled \
 	--endpoint https://your.kusto.windows.net/ \
 	--database kustodb_name \
-	--event kusto_event
+	--coverage-event kusto_event \
+	--ignore-event ignore_event
 `
 
 	gocoverTestLong = `Run unit tests on the module, then apply full coverage or diff coverage calculation on the results.

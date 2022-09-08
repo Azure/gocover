@@ -76,6 +76,6 @@ func (o *DBOption) GetDbClient(logger logrus.FieldLogger) (DbClient, error) {
 		o.KustoOption.Logger = logger
 		return NewKustoClient(&o.KustoOption)
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDBType, o.DbType)
 	}
 }

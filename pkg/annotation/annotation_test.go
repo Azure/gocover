@@ -107,6 +107,23 @@ func TestParseIgnoreProfiles(t *testing.T) {
 		dir := t.TempDir()
 		f := filepath.Join(dir, "foo.go")
 		fileContents := `
+		//+gocover:ignore:file
+		package foo
+
+		func foo() {}
+	`
+		ioutil.WriteFile(f, []byte(fileContents), 0666)
+
+		_, err := ParseIgnoreProfiles(f, nil)
+		if err == nil {
+			t.Errorf("should return error, but return nil")
+		}
+	})
+
+	t.Run("ignore file", func(t *testing.T) {
+		dir := t.TempDir()
+		f := filepath.Join(dir, "foo.go")
+		fileContents := `
 		//+gocover:ignore:file ignore this file!
 		{
 			//+gocover:ignore:block ignore this block!

@@ -40,20 +40,22 @@ func NewKustoClient(option *KustoOption) (DbClient, error) {
 
 	kustoClient, err := kusto.New(option.Endpoint, authorizer)
 	if err != nil {
-		return nil, fmt.Errorf("kusto: %s", err)
+		return nil, fmt.Errorf("kusto: %w", err)
 	}
 
 	coverageIngestor, err := ingest.New(kustoClient, option.Database, option.CoverageEvent)
-	if err != nil {
-		return nil, fmt.Errorf("coveage ingestor: %s", err)
+	if err != nil { //+gocover:ignore:block cannot test kusto connection without enough credentials
+		return nil, fmt.Errorf("coverage ingestor: %w", err)
 	}
 
 	ignoreIngestor, err := ingest.New(kustoClient, option.Database, option.IgnoreEvent)
-	if err != nil {
-		return nil, fmt.Errorf("ignore ingestor: %s", err)
+	//+gocover:ignore:block cannot test kusto connection without enough credentials
+
+	if err != nil { //+gocover:ignore:block cannot test kusto connection without enough credentials
+		return nil, fmt.Errorf("ignore ingestor: %w", err)
 	}
 
-	return &KustoClient{
+	return &KustoClient{ //+gocover:ignore:block cannot test kusto connection without enough credentials
 		coverageIngestor: coverageIngestor,
 		ignoreIngestor:   ignoreIngestor,
 		mappings:         option.extraMappings,

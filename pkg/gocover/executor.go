@@ -105,9 +105,8 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 
 	logger.Infof("run unit tests: '%s'", testString)
 	if err := cmd.Run(); err != nil {
-		err = fmt.Errorf(`run unit test '%s' failed: %w`, testString, err)
-		t.logger.WithError(err).Error()
-		return err
+		t.logger.WithError(err).Errorf(`run unit test '%s'`, testString)
+		return fmt.Errorf("unit test failed: %w", err)
 	}
 
 	gocover, err := buildGoCover(t.mode, t.option, []string{coverFile}, logger)
@@ -142,7 +141,7 @@ type ginkgoTestExecutor struct {
 func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 	err := e.runTests(ctx)
 	if err != nil {
-		return fmt.Errorf("run tests: %w", err)
+		return err
 	}
 
 	coverFiles, err := findCoverProfiles(filepath.Join(e.repositoryPath, e.moduleDir))
@@ -224,9 +223,8 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
 	buildCmd.Stdout = executor.stdout
 	buildCmd.Stderr = executor.stderr
 	if err := buildCmd.Run(); err != nil {
-		err = fmt.Errorf(`executing cmd %s failed: %w`, buildString, err)
-		logger.WithError(err).Error()
-		return err
+		logger.WithError(err).Errorf(`executing cmd %s`, buildString)
+		return fmt.Errorf("build tests: %w", err)
 	}
 	logger.Infof("ginkgo tests built sucessfully")
 
@@ -246,9 +244,8 @@ func (executor *ginkgoTestExecutor) runTests(ctx context.Context) error {
 	runCmd.Stdout = executor.stdout
 	runCmd.Stderr = executor.stderr
 	if err := runCmd.Run(); err != nil {
-		err = fmt.Errorf(`executing cmd %s failed: %w`, runString, err)
-		logger.WithError(err).Error()
-		return err
+		logger.WithError(err).Errorf(`executing cmd %s`, runString)
+		return fmt.Errorf("unit test failed: %w", err)
 	}
 	logger.Info("ginkgo tests run sucessfully")
 
