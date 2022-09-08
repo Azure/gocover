@@ -45,14 +45,16 @@ type IgnoreProfile struct {
 	Filename     string
 	IgnoreBlocks map[cover.ProfileBlock]*IgnoreBlock
 	Comments     string // comments about file ignore
+	Annotation   string // concrete ignore pattern
 }
 
 // IgnoreBlock represents a single block of ignore profiling data.
 type IgnoreBlock struct {
-	Annotation string   // concrete ignore pattern
-	Contents   []string // ignore contents
-	Lines      []int    // corresponding code line number of the ignore contents
-	Comments   string   // comments about block ignore
+	Annotation           string   // concrete ignore pattern
+	AnnotationLineNumber int      // line number the ignore pattern locates at
+	Contents             []string // ignore contents
+	Lines                []int    // corresponding code line number of the ignore contents
+	Comments             string   // comments about block ignore
 }
 
 // ParseIgnoreProfiles parses ignore profile data in the specified file with the help of go unit test cover profile,
@@ -102,6 +104,7 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 
 		if ignoreKind == "file" { // set type to FILE_IGNORE and skip further processing
 			profile.Type = FILE_IGNORE
+			profile.Annotation = fileLines[i]
 			profile.Comments = comments
 			profile.IgnoreBlocks = nil
 			break
@@ -140,7 +143,7 @@ func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cov
 	}
 
 	if _, ok := profile.IgnoreBlocks[*profileBlock]; !ok {
-		ignoreBlock := &IgnoreBlock{Annotation: patternText, Comments: comments}
+		ignoreBlock := &IgnoreBlock{Annotation: patternText, Comments: comments, AnnotationLineNumber: patternLineNumber}
 
 		// Record the ignore code profile contents
 		for i := profileBlock.StartLine; i <= profileBlock.EndLine; i++ {

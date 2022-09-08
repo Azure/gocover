@@ -16,6 +16,9 @@ type Package struct {
 
 	// Functions is a list of functions registered with this package.
 	Functions []*Function
+
+	// IgnoreProfiles is a list of ignore profiles that within this package.
+	IgnoreProfiles []*annotation.IgnoreProfile
 }
 
 type Function struct {
@@ -40,8 +43,6 @@ type Function struct {
 
 	// statements registered with this function.
 	Statements []*Statement
-
-	IgnoreProfile *annotation.IgnoreProfile
 }
 
 type Statement struct {

@@ -89,6 +89,9 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 		parser.logger.WithError(err).Error("parse ignore profile")
 		return err
 	}
+	if ignoreProfile != nil && len(ignoreProfile.IgnoreBlocks) != 0 {
+		pkg.IgnoreProfiles = append(pkg.IgnoreProfiles, ignoreProfile)
+	}
 
 	// Find function and statement extents; create corresponding
 	// Functions and Statements, and keep a separate
