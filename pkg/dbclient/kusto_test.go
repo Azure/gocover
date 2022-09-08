@@ -53,7 +53,13 @@ func TestKustoOptionValidate(t *testing.T) {
 			t.Error("event")
 		}
 
-		o.Event = "event"
+		o.CoverageEvent = "cover-event"
+		err = o.Validate()
+		if err == nil {
+			t.Errorf("should success, but get %s", err)
+		}
+
+		o.IgnoreEvent = "ignore-event"
 		err = o.Validate()
 		if err != nil {
 			t.Errorf("should success, but get %s", err)

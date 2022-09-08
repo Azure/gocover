@@ -43,44 +43,75 @@ func NewKustoClient(option *KustoOption) (DbClient, error) {
 		return nil, fmt.Errorf("kusto: %s", err)
 	}
 
-	in, err := ingest.New(kustoClient, option.Database, option.Event)
+	coverageIngestor, err := ingest.New(kustoClient, option.Database, option.CoverageEvent)
 	if err != nil {
-		return nil, fmt.Errorf("ingest: %s", err)
+		return nil, fmt.Errorf("coveage ingestor: %s", err)
+	}
+
+	ignoreIngestor, err := ingest.New(kustoClient, option.Database, option.IgnoreEvent)
+	if err != nil {
+		return nil, fmt.Errorf("ignore ingestor: %s", err)
 	}
 
 	return &KustoClient{
-		ingestor:  in,
-		mappings:  append(basicMappings, option.extraMappings...),
-		extraData: option.extraData,
-		logger:    option.Logger.WithField("source", "KustoClient"),
+		coverageIngestor: coverageIngestor,
+		ignoreIngestor:   ignoreIngestor,
+		mappings:         append(basicMappings, option.extraMappings...),
+		extraData:        option.extraData,
+		logger:           option.Logger.WithField("source", "KustoClient"),
 	}, nil
 
 }
 
 // KustoClient wraps the kusto ingestor and the extra column data and corresponding mappings.
 type KustoClient struct {
-	ingestor  ingest.Ingestor
-	mappings  []mapping
-	extraData map[string]interface{}
-	logger    logrus.FieldLogger
+	coverageIngestor ingest.Ingestor
+	ignoreIngestor   ingest.Ingestor
+	mappings         []mapping
+	extraData        map[string]interface{}
+	logger           logrus.FieldLogger
 }
 
 var _ DbClient = (*KustoClient)(nil)
 
-// Store stores the data to kusto.
-func (client *KustoClient) Store(ctx context.Context, data *Data) error {
+func (client *KustoClient) StoreCoverageData(ctx context.Context, data *CoverageData) error {
 	data.Extra = client.extraData
 	dataBytes, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("data json marshal: %w", err)
 	}
+	err = store(ctx, client.coverageIngestor, dataBytes, client.mappings, client.logger.WithField("ingestor", "coverage"))
+	if err != nil {
+		return fmt.Errorf("store coverage data: %w", err)
+	}
+	return nil
+}
 
-	mappingsBytes, err := json.Marshal(client.mappings)
+func (client *KustoClient) StoreIgnoreProfileData(ctx context.Context, data *IgnoreProfileData) error {
+	data.Extra = client.extraData
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("data json marshal: %w", err)
+	}
+	err = store(ctx, client.ignoreIngestor, dataBytes, client.mappings, client.logger.WithField("ingestor", "ignoreProfile"))
+	if err != nil {
+		return fmt.Errorf("store ignore profile data: %w", err)
+	}
+	return nil
+}
+
+func store(ctx context.Context,
+	ingestor ingest.Ingestor,
+	dataBytes []byte,
+	mappings []mapping,
+	logger logrus.FieldLogger,
+) error {
+	mappingsBytes, err := json.Marshal(mappings)
 	if err != nil {
 		return fmt.Errorf("mappings json marshal: %w", err)
 	}
 
-	_, err = client.ingestor.FromReader(
+	_, err = ingestor.FromReader(
 		ctx,
 		bytes.NewReader(dataBytes),
 		ingest.FileFormat(ingest.JSON),
@@ -90,7 +121,7 @@ func (client *KustoClient) Store(ctx context.Context, data *Data) error {
 		return fmt.Errorf("ingestor from reader %w", err)
 	}
 
-	client.logger.Debugf("send to kusto: %s\n", string(dataBytes))
+	logger.Debugf("send to kusto: %s\n", string(dataBytes))
 	return nil
 }
 
@@ -99,7 +130,8 @@ type KustoOption struct {
 	UseKusto      bool
 	Endpoint      string
 	Database      string
-	Event         string
+	CoverageEvent string
+	IgnoreEvent   string
 	CustomColumns []string
 	Logger        logrus.FieldLogger
 
@@ -131,8 +163,11 @@ func (o *KustoOption) Validate() error {
 	if o.Database == "" {
 		return fmt.Errorf("%s %w", "database", ErrFlagRequired)
 	}
-	if o.Event == "" {
-		return fmt.Errorf("%s %w", "event", ErrFlagRequired)
+	if o.CoverageEvent == "" {
+		return fmt.Errorf("%s %w", "coverage-event", ErrFlagRequired)
+	}
+	if o.IgnoreEvent == "" {
+		return fmt.Errorf("%s %w", "ignore-event", ErrFlagRequired)
 	}
 
 	// each custom column has format: {column}:{datatype}:{value}
@@ -141,12 +176,19 @@ func (o *KustoOption) Validate() error {
 	// token 2: column value
 	for _, m := range o.CustomColumns {
 		tokens := strings.Split(m, Separator)
-		if len(tokens) != 3 {
+		if len(tokens) < 2 {
 			return fmt.Errorf("%s %w", m, ErrFormatCustomColumn)
 		}
 
-		if tokens[0] == "" || tokens[1] == "" || tokens[2] == "" {
-			return fmt.Errorf("empty custom column string [%s], format is {column}:{datatype}:{value}", m)
+		var messages []string
+		if tokens[0] == "" {
+			messages = append(messages, "column name is empty")
+		}
+		if tokens[1] == "" {
+			messages = append(messages, "datatype is empty")
+		}
+		if len(messages) != 0 {
+			return fmt.Errorf("%s: %w, %s", m, ErrFormatCustomColumn, strings.Join(messages, ","))
 		}
 
 		// build extra data kusto mapping
@@ -163,7 +205,11 @@ func (o *KustoOption) Validate() error {
 		}
 
 		// add extra data to final data struct
-		o.extraData[tokens[0]] = tokens[2]
+		if len(tokens) < 3 {
+			o.extraData[tokens[0]] = ""
+		} else {
+			o.extraData[tokens[0]] = tokens[2]
+		}
 	}
 
 	return nil

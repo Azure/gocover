@@ -88,11 +88,11 @@ func formatFilePath(rootRepoPath, fileNamePath, modulePath string) string {
 	)
 }
 
-// store send all coverage results to db store
-func store(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInformation, coverageMode CoverageMode, modulePath string) error {
+// storeCoverageData send all coverage results to db store
+func storeCoverageData(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInformation, coverageMode CoverageMode, modulePath string) error {
 	now := time.Now().UTC()
 	for _, info := range all {
-		err := dbClient.Store(ctx, &dbclient.Data{
+		err := dbClient.StoreCoverageData(ctx, &dbclient.CoverageData{
 			PreciseTimestamp: now,
 			TotalLines:       info.TotalLines,
 			EffectiveLines:   info.TotalEffectiveLines,
@@ -104,12 +104,34 @@ func store(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInf
 			CoverageMode:     string(coverageMode),
 		})
 		if err != nil {
-			return fmt.Errorf("store data: %w", err)
+			return err
 		}
 	}
 
 	return nil
 }
+
+// func storeIgnoreProfileData(ctx context.Context, dbClient dbclient.DbClient, ignoreProfiles []*annotation.IgnoreProfile, coverageMode CoverageMode, modulePath string) error {
+// 	now := time.Now().UTC()
+// 	for _, info := range ignoreProfiles {
+// 		err := dbClient.StoreCoverageData(ctx, &dbclient.CoverageData{
+// 			PreciseTimestamp: now,
+// 			TotalLines:       info.TotalLines,
+// 			EffectiveLines:   info.TotalEffectiveLines,
+// 			IgnoredLines:     info.TotalIgnoredLines,
+// 			CoveredLines:     info.TotalCoveredLines,
+// 			ModulePath:       modulePath,
+// 			FilePath:         info.Path,
+// 			Coverage:         calculateCoverage(info.TotalCoveredLines, info.TotalEffectiveLines),
+// 			CoverageMode:     string(coverageMode),
+// 		})
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
+
+// 	return nil
+// }
 
 // dump outputs all coverage results
 func dump(all []*report.AllInformation, logger logrus.FieldLogger) {

@@ -109,7 +109,8 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar((*string)(&dbOption.DbType), "store-type", string(dbclient.None), "db client type")
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Endpoint, "endpoint", "", "kusto endpoint")
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Database, "database", "", "kusto database")
-	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Event, "event", "", "kusto event")
+	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.CoverageEvent, "coverage-event", "", "kusto event for coverage")
+	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.IgnoreEvent, "ignore-event", "", "kusto event for ignore information")
 	cmd.PersistentFlags().StringSliceVar(&dbOption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
 	cmd.PersistentFlags().IntVar(&timeoutInSeconds, "timeout", defaultTimeoutInSeconds, "execute timeout in seconds")
 

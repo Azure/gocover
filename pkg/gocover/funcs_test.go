@@ -180,17 +180,22 @@ func foo() {
 }
 
 type mockDbClient struct {
-	storeFn func(context context.Context, data *dbclient.Data) error
+	storeCoverageDataFn      func(context context.Context, data *dbclient.CoverageData) error
+	storeIgnoreProfileDataFn func(context context.Context, data *dbclient.IgnoreProfileData) error
 }
 
-func (client *mockDbClient) Store(context context.Context, data *dbclient.Data) error {
-	return client.storeFn(context, data)
+func (client *mockDbClient) StoreCoverageData(context context.Context, data *dbclient.CoverageData) error {
+	return client.storeCoverageDataFn(context, data)
+}
+
+func (client *mockDbClient) StoreIgnoreProfileData(context context.Context, data *dbclient.IgnoreProfileData) error {
+	return client.storeIgnoreProfileDataFn(context, data)
 }
 
 func TestStore(t *testing.T) {
 	t.Run("store successfully", func(t *testing.T) {
 		client := &mockDbClient{
-			storeFn: func(context context.Context, data *dbclient.Data) error {
+			storeCoverageDataFn: func(context context.Context, data *dbclient.CoverageData) error {
 				return nil
 			},
 		}
@@ -199,12 +204,12 @@ func TestStore(t *testing.T) {
 			{TotalLines: 120, TotalEffectiveLines: 100, TotalIgnoredLines: 20, TotalCoveredLines: 80},
 		}
 
-		err := store(context.Background(), client, all, FullCoverage, "")
+		err := storeCoverageData(context.Background(), client, all, FullCoverage, "")
 		if err != nil {
 			t.Errorf("should return nil, but get error: %s", err)
 		}
 
-		err = store(context.Background(), client, nil, FullCoverage, "")
+		err = storeCoverageData(context.Background(), client, nil, FullCoverage, "")
 		if err != nil {
 			t.Errorf("should return nil, but get error: %s", err)
 		}
@@ -212,7 +217,7 @@ func TestStore(t *testing.T) {
 
 	t.Run("store failed", func(t *testing.T) {
 		client := &mockDbClient{
-			storeFn: func(context context.Context, data *dbclient.Data) error {
+			storeCoverageDataFn: func(context context.Context, data *dbclient.CoverageData) error {
 				return errors.New("unexpected error")
 			},
 		}
@@ -221,7 +226,7 @@ func TestStore(t *testing.T) {
 			{TotalLines: 120, TotalEffectiveLines: 100, TotalIgnoredLines: 20, TotalCoveredLines: 80},
 		}
 
-		err := store(context.Background(), client, all, FullCoverage, "")
+		err := storeCoverageData(context.Background(), client, all, FullCoverage, "")
 		if err == nil {
 			t.Errorf("should return error, but no error")
 		}

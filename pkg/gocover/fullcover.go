@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/parser"
 	"github.com/Azure/gocover/pkg/report"
@@ -69,6 +70,7 @@ type fullCover struct {
 	modulePath      string
 	repositoryPath  string
 	excludePatterns []string
+	ignoreProfiles  []*annotation.IgnoreProfile
 	excludeFiles    excludeFileCache
 	coverageTree    report.CoverageTree
 	reportGenerator report.ReportGenerator
@@ -81,7 +83,7 @@ func (full *fullCover) Run(ctx context.Context) error {
 
 	statistics, err := full.generateStatistics()
 	if err != nil {
-		return fmt.Errorf("full: %s", err)
+		return fmt.Errorf("full: %w", err)
 	}
 
 	if err := full.reportGenerator.GenerateReport(statistics); err != nil {
@@ -99,9 +101,9 @@ func (full *fullCover) dump(ctx context.Context) error {
 	all := full.coverageTree.All()
 
 	if full.dbClient != nil {
-		err := store(ctx, full.dbClient, all, FullCoverage, full.moduleDir)
+		err := storeCoverageData(ctx, full.dbClient, all, FullCoverage, full.modulePath)
 		if err != nil {
-			return fmt.Errorf("store data: %w", err)
+			return fmt.Errorf("store coverage data: %w", err)
 		}
 	}
 
@@ -122,6 +124,7 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 	fileCache := make(fileContentsCache)
 	for _, pkg := range *packages {
 		full.logger.Debugf("package: %s", pkg.Name)
+		full.ignoreProfiles = append(full.ignoreProfiles, pkg.IgnoreProfiles...)
 
 		p, err := build.Import(pkg.Name, ".", build.FindOnly)
 		if err != nil {

@@ -18,10 +18,11 @@ const (
 
 // DbClient interface for storing gocover data.
 type DbClient interface {
-	Store(context context.Context, data *Data) error
+	StoreCoverageData(context context.Context, data *CoverageData) error
+	StoreIgnoreProfileData(context context.Context, data *IgnoreProfileData) error
 }
 
-type Data struct {
+type CoverageData struct {
 	PreciseTimestamp time.Time `json:"preciseTimestamp"` // time send to db
 	TotalLines       int64     `json:"totalLines"`       // total lines of the entire repo/module.
 	EffectiveLines   int64     `json:"effectiveLines"`   // the lines for coverage base, total lines - ignored lines
@@ -32,6 +33,10 @@ type Data struct {
 	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
 	FilePath         string    `json:"filePath"`         // file path for a concrete file or directory
 
+	Extra map[string]interface{} // extra data that passing accordingly
+}
+
+type IgnoreProfileData struct {
 	Extra map[string]interface{} // extra data that passing accordingly
 }
 
