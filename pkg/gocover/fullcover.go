@@ -105,6 +105,10 @@ func (full *fullCover) dump(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("store coverage data: %w", err)
 		}
+		err = storeIgnoreProfileData(ctx, full.dbClient, full.ignoreProfiles, FullCoverage, full.modulePath, full.repositoryPath, full.moduleDir)
+		if err != nil {
+			return fmt.Errorf("store ignore profile data: %w", err)
+		}
 	}
 
 	dump(all, full.logger)

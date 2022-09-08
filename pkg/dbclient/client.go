@@ -37,6 +37,17 @@ type CoverageData struct {
 }
 
 type IgnoreProfileData struct {
+	PreciseTimestamp time.Time `json:"preciseTimestamp"` // time send to db
+	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
+	FilePath         string    `json:"filePath"`         // file path for a concrete file
+	Annotation       string    `json:"annotation"`       // ignore annotation
+	LineNumber       int       `json:"lineNumber"`       // line number of the annotation in file
+	StartLine        int       `json:"startLine"`        // start line of ignore block
+	EndLine          int       `json:"endLine"`          // end line of ignore block
+	Comments         string    `json:"comments"`         // ignore annotation comments
+	Contents         string    `json:"contents"`         // ignore annotation contents
+	IgnoreType       string    `json:"ignoreType"`       // ignore annotation type
+
 	Extra map[string]interface{} // extra data that passing accordingly
 }
 

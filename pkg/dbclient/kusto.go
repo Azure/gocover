@@ -56,7 +56,7 @@ func NewKustoClient(option *KustoOption) (DbClient, error) {
 	return &KustoClient{
 		coverageIngestor: coverageIngestor,
 		ignoreIngestor:   ignoreIngestor,
-		mappings:         append(basicMappings, option.extraMappings...),
+		mappings:         option.extraMappings,
 		extraData:        option.extraData,
 		logger:           option.Logger.WithField("source", "KustoClient"),
 	}, nil
@@ -80,7 +80,12 @@ func (client *KustoClient) StoreCoverageData(ctx context.Context, data *Coverage
 	if err != nil {
 		return fmt.Errorf("data json marshal: %w", err)
 	}
-	err = store(ctx, client.coverageIngestor, dataBytes, client.mappings, client.logger.WithField("ingestor", "coverage"))
+	err = store(ctx,
+		client.coverageIngestor,
+		dataBytes,
+		append(basicCoverageMappings, client.mappings...),
+		client.logger.WithField("ingestor", "coverage"),
+	)
 	if err != nil {
 		return fmt.Errorf("store coverage data: %w", err)
 	}
@@ -93,7 +98,12 @@ func (client *KustoClient) StoreIgnoreProfileData(ctx context.Context, data *Ign
 	if err != nil {
 		return fmt.Errorf("data json marshal: %w", err)
 	}
-	err = store(ctx, client.ignoreIngestor, dataBytes, client.mappings, client.logger.WithField("ingestor", "ignoreProfile"))
+	err = store(ctx,
+		client.ignoreIngestor,
+		dataBytes,
+		append(basicIgnoreProfileMappings, client.mappings...),
+		client.logger.WithField("ingestor", "ignoreProfile"),
+	)
 	if err != nil {
 		return fmt.Errorf("store ignore profile data: %w", err)
 	}
@@ -228,8 +238,8 @@ type mapping struct {
 	Properties properties `json:"Properties"`
 }
 
-// basicMappings gives the fundemental mappings for Data struct and kusto table
-var basicMappings = []mapping{
+// basicCoverageMappings gives the fundemental mappings for Data struct and kusto table
+var basicCoverageMappings = []mapping{
 	{
 		Column:   "preciseTimestamp",
 		Datatype: "datetime",
@@ -291,6 +301,79 @@ var basicMappings = []mapping{
 		Datatype: "string",
 		Properties: properties{
 			Path: "$.coverageMode",
+		},
+	},
+}
+
+var basicIgnoreProfileMappings = []mapping{
+	{
+		Column:   "preciseTimestamp",
+		Datatype: "datetime",
+		Properties: properties{
+			Path: "$.preciseTimestamp",
+		},
+	},
+	{
+		Column:   "filePath",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.filePath",
+		},
+	},
+	{
+		Column:   "modulePath",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.modulePath",
+		},
+	},
+	{
+		Column:   "annotation",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.annotation",
+		},
+	},
+	{
+		Column:   "lineNumber",
+		Datatype: "int",
+		Properties: properties{
+			Path: "$.lineNumber",
+		},
+	},
+	{
+		Column:   "startLine",
+		Datatype: "int",
+		Properties: properties{
+			Path: "$.startLine",
+		},
+	},
+	{
+		Column:   "endLine",
+		Datatype: "int",
+		Properties: properties{
+			Path: "$.endLine",
+		},
+	},
+	{
+		Column:   "comments",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.comments",
+		},
+	},
+	{
+		Column:   "contents",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.contents",
+		},
+	},
+	{
+		Column:   "ignoreType",
+		Datatype: "string",
+		Properties: properties{
+			Path: "$.ignoreType",
 		},
 	},
 }

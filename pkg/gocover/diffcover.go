@@ -125,6 +125,10 @@ func (diff *diffCover) dump(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("store coverage data: %w", err)
 		}
+		err = storeIgnoreProfileData(ctx, diff.dbClient, diff.ignoreProfiles, FullCoverage, diff.modulePath, diff.repositoryPath, diff.moduleDir)
+		if err != nil {
+			return fmt.Errorf("store ignore profile data: %w", err)
+		}
 	}
 
 	dump(all, diff.logger)
