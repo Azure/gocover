@@ -7,7 +7,15 @@ var htmlCoverageReport = "" +
 
 <head>
     <meta charset="utf-8">
-    <title>Diff Coverage</title>
+    <title>
+    {{ if IsFullCoverageReport .StatisticsType }}
+        Full Coverage
+    {{ end }}
+
+    {{ if IsDiffCoverageReport .StatisticsType }}
+        Diff Coverage
+    {{ end }}
+    </title>
     <style type="text/css">
         .src-snippet {
             margin-top: 2em;
@@ -20,6 +28,16 @@ var htmlCoverageReport = "" +
         .snippets {
             border-top: 1px solid #bdbdbd;
             border-bottom: 1px solid #bdbdbd;
+        }
+
+        a {
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        a:active {
+            color: black;
         }
     </style>
 </head>
@@ -77,7 +95,7 @@ var htmlCoverageReport = "" +
             <tbody>
                 {{ range .CoverageProfile }}
                 <tr>
-                    <td>{{ .FileName }}</td>
+                    <td><a href="#{{.FileName}}">{{ .FileName }}</a></td>
                     <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines }}</td>
                     <td>{{ .CoveredLines }}</td>
                     <td>{{ .TotalIgnoredLines }}</td>
@@ -91,7 +109,7 @@ var htmlCoverageReport = "" +
         {{ range .CoverageProfile }}
             <div class="src-snippet">
                 {{ if lt (PercentCovered .TotalEffectiveLines .CoveredLines) 100.0 }}
-                <div class="src-name">{{ .FileName }}</div>
+                <div class="src-name" id="{{.FileName}}">{{ .FileName }}</div>
                 <div class="snippets">
                     {{range .CodeSnippet}}
                     {{ . }}
