@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/bmatcuk/doublestar/v4"
@@ -88,11 +89,11 @@ func formatFilePath(rootRepoPath, fileNamePath, modulePath string) string {
 	)
 }
 
-// store send all coverage results to db store
-func store(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInformation, coverageMode CoverageMode, modulePath string) error {
+// storeCoverageData send all coverage results to db store
+func storeCoverageData(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInformation, coverageMode CoverageMode, modulePath string) error {
 	now := time.Now().UTC()
 	for _, info := range all {
-		err := dbClient.Store(ctx, &dbclient.Data{
+		err := dbClient.StoreCoverageData(ctx, &dbclient.CoverageData{
 			PreciseTimestamp: now,
 			TotalLines:       info.TotalLines,
 			EffectiveLines:   info.TotalEffectiveLines,
@@ -104,7 +105,48 @@ func store(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInf
 			CoverageMode:     string(coverageMode),
 		})
 		if err != nil {
-			return fmt.Errorf("store data: %w", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func storeIgnoreProfileData(ctx context.Context, dbClient dbclient.DbClient, ignoreProfiles []*annotation.IgnoreProfile, coverageMode CoverageMode, modulePath string, repositoryPath string, moduleDir string) error {
+	now := time.Now().UTC()
+	for _, profile := range ignoreProfiles {
+		formattedFilePath := filepath.Join(modulePath, strings.TrimPrefix(profile.Filename, filepath.Join(repositoryPath, moduleDir)))
+		if profile.Type == annotation.FILE_IGNORE {
+			err := dbClient.StoreIgnoreProfileData(ctx, &dbclient.IgnoreProfileData{
+				PreciseTimestamp: now,
+				FilePath:         formattedFilePath,
+				ModulePath:       modulePath,
+				IgnoreType:       string(profile.Type),
+				Comments:         profile.Comments,
+				Annotation:       profile.Annotation,
+			})
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		for _, block := range profile.IgnoreBlocks {
+			err := dbClient.StoreIgnoreProfileData(ctx, &dbclient.IgnoreProfileData{
+				PreciseTimestamp: now,
+				FilePath:         formattedFilePath,
+				ModulePath:       modulePath,
+				IgnoreType:       string(profile.Type),
+				LineNumber:       block.AnnotationLineNumber,
+				StartLine:        block.Lines[0],
+				EndLine:          block.Lines[len(block.Lines)-1],
+				Comments:         block.Comments,
+				Annotation:       block.Annotation,
+				Contents:         strings.Join(block.Contents, "\n"),
+			})
+			if err != nil {
+				return err
+			}
 		}
 	}
 

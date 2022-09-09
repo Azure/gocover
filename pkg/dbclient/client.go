@@ -18,10 +18,11 @@ const (
 
 // DbClient interface for storing gocover data.
 type DbClient interface {
-	Store(context context.Context, data *Data) error
+	StoreCoverageData(context context.Context, data *CoverageData) error
+	StoreIgnoreProfileData(context context.Context, data *IgnoreProfileData) error
 }
 
-type Data struct {
+type CoverageData struct {
 	PreciseTimestamp time.Time `json:"preciseTimestamp"` // time send to db
 	TotalLines       int64     `json:"totalLines"`       // total lines of the entire repo/module.
 	EffectiveLines   int64     `json:"effectiveLines"`   // the lines for coverage base, total lines - ignored lines
@@ -31,6 +32,21 @@ type Data struct {
 	CoverageMode     string    `json:"coverageMode"`     // coverage mode, diff or full subcommand
 	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
 	FilePath         string    `json:"filePath"`         // file path for a concrete file or directory
+
+	Extra map[string]interface{} // extra data that passing accordingly
+}
+
+type IgnoreProfileData struct {
+	PreciseTimestamp time.Time `json:"preciseTimestamp"` // time send to db
+	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
+	FilePath         string    `json:"filePath"`         // file path for a concrete file
+	Annotation       string    `json:"annotation"`       // ignore annotation
+	LineNumber       int       `json:"lineNumber"`       // line number of the annotation in file
+	StartLine        int       `json:"startLine"`        // start line of ignore block
+	EndLine          int       `json:"endLine"`          // end line of ignore block
+	Comments         string    `json:"comments"`         // ignore annotation comments
+	Contents         string    `json:"contents"`         // ignore annotation contents
+	IgnoreType       string    `json:"ignoreType"`       // ignore annotation type
 
 	Extra map[string]interface{} // extra data that passing accordingly
 }
@@ -60,6 +76,6 @@ func (o *DBOption) GetDbClient(logger logrus.FieldLogger) (DbClient, error) {
 		o.KustoOption.Logger = logger
 		return NewKustoClient(&o.KustoOption)
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedDBType, o.DbType)
 	}
 }

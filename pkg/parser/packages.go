@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+
+	"github.com/Azure/gocover/pkg/annotation"
 )
 
 type Package struct {
@@ -14,6 +16,9 @@ type Package struct {
 
 	// Functions is a list of functions registered with this package.
 	Functions []*Function
+
+	// IgnoreProfiles is a list of ignore profiles that within this package.
+	IgnoreProfiles []*annotation.IgnoreProfile
 }
 
 type Function struct {
