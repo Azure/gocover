@@ -91,7 +91,7 @@ func createLogger(cmd *cobra.Command) *logrus.Logger {
 }
 
 // NewGoCoverCommand creates a command object for generating diff coverage reporter.
-func NewGoCoverCommand() *cobra.Command {
+func NewGoCoverCommand(version, commit, date string) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:          "gocover",
@@ -119,22 +119,7 @@ func NewGoCoverCommand() *cobra.Command {
 	cmd.AddCommand(newDiffCoverageCommand())
 	cmd.AddCommand(newFullCoverageCommand())
 	cmd.AddCommand(newGoCoverTestCommand())
-	cmd.AddCommand(newVersionCommand())
-	return cmd
-}
-
-const VERSION = "1.0.0"
-
-func newVersionCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "version",
-		Short:   "print Gocover's version",
-		Example: "gocover version",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(cmd.OutOrStdout(), "Gocover Version %s\n", VERSION)
-			return nil
-		},
-	}
+	cmd.AddCommand(newVersionCommand(version, commit, date))
 	return cmd
 }
 
