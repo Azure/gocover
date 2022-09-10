@@ -166,7 +166,7 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 	fileCache := make(fileContentsCache)
 	added := make(map[string]*report.CoverageProfile)
 	keep := make(map[string]string)
-	for _, pkg := range *packages {
+	for _, pkg := range packages {
 		diff.logger.Debugf("package: %s", pkg.Name)
 		diff.ignoreProfiles = append(diff.ignoreProfiles, pkg.IgnoreProfiles...)
 

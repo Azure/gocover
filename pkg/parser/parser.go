@@ -7,6 +7,7 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Azure/gocover/pkg/annotation"
@@ -39,7 +40,7 @@ type Parser struct {
 }
 
 // Parse parses cover profiles into statements, and modify their state based on git changes.
-func (parser *Parser) Parse(changes []*gittool.Change) (*Packages, error) {
+func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
 	var result Packages
 
 	for _, coverProfile := range parser.coverProfileFiles {
@@ -61,7 +62,7 @@ func (parser *Parser) Parse(changes []*gittool.Change) (*Packages, error) {
 		}
 	}
 
-	return &result, nil
+	return result, nil
 }
 
 // wrapper for Statement
@@ -108,7 +109,7 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 		parser.logger.WithError(err).Error("find Functions")
 		return err
 	}
-	var stmts []statement
+	var stmts []*statement
 	for _, fe := range extents {
 		f := &Function{
 			Name:      fe.name,
@@ -119,14 +120,14 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 			EndLine:   fe.endLine,
 		}
 		for _, se := range fe.stmts {
-			s := statement{
+			s := &statement{
 				Statement: &Statement{
 					StartLine: se.startLine,
 					EndLine:   se.endLine,
 					Start:     se.startOffset,
 					End:       se.endOffset,
 					Mode:      Keep,
-					State:     findState(se, change),
+					State:     Original,
 				},
 				StmtExtent: se,
 			}
@@ -169,6 +170,8 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 			break
 		}
 	}
+
+	parser.setStatementsState(change, stmts)
 	return nil
 }
 
@@ -373,23 +376,75 @@ func (v *StmtVisitor) VisitStmt(s ast.Stmt) {
 	}
 }
 
-// findState check the change line
-// if it hits the statement, means change on that statement, and return "Changed"
-// otherwise, return "Original"
-func findState(stmt *StmtExtent, change *gittool.Change) State {
+// setStatementsState sets statements' State field according to the file change.
+// If change is nil, means no change is made, it usually runs in full coverage mode
+// If change is not nil, loop over each changed lines and find its statement and set the statement to Changed
+func (parser *Parser) setStatementsState(change *gittool.Change, statements []*statement) {
 	if change == nil {
-		return Original
+		return
+	}
+	if len(statements) == 0 {
+		return
 	}
 
+	sort.Sort(statementByStart(statements))
+
+	parser.logger.Debugf("processing changed file: %s", change.FileName)
 	for _, s := range change.Sections {
-		for i := s.StartLine; i <= s.EndLine; i++ {
-			if stmt.startLine <= i && stmt.endLine >= i {
-				return Changed
+		for lineNum := s.StartLine; lineNum <= s.EndLine; lineNum++ {
+			if isCodeLine(s.Contents[lineNum-s.StartLine]) {
+				parser.setStatementsStateByLineNumber(lineNum, statements)
 			}
 		}
 	}
+}
 
-	return Original
+func isCodeLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return trimmed != "" && !strings.HasPrefix(trimmed, "//")
+}
+
+// setStatementsStateByLineNumber sets statements' State field based on code line number.
+// It sort statements by startline first, then try to find first statement
+// that line number is greater than or equals the startline of the statement.
+// There are two edge cases:
+// 1. When line number is less than all the statements, `Search` function will return 0,
+//    but there is no suitable statement, should return immediately.
+// 2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
+//    then statement of that position minus one is the statement we want,
+//    but still need to check whether the changed line is among the statement scope.
+func (parser *Parser) setStatementsStateByLineNumber(changedlineNumber int, statements []*statement) {
+	idx := sort.Search(len(statements), func(i int) bool {
+		return statements[i].startLine > changedlineNumber
+	})
+
+	if idx == 0 { // no suitable statement
+		return
+	}
+
+	idx--
+	stmt := statements[idx]
+
+	if stmt != nil && lineNumberInStatement(changedlineNumber, stmt) {
+		stmt.State = Changed
+		parser.logger.Debugf(
+			"for changed line number %d, set statement [%d:%d] to %s",
+			changedlineNumber, statements[idx].startLine, statements[idx].endLine, statements[idx].State,
+		)
+	}
+}
+
+func lineNumberInStatement(lineNumber int, stmt *statement) bool {
+	return stmt.startLine <= lineNumber && stmt.endLine >= lineNumber
+}
+
+type statementByStart []*statement
+
+func (s statementByStart) Len() int      { return len(s) }
+func (s statementByStart) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+func (s statementByStart) Less(i, j int) bool {
+	si, sj := s[i], s[j]
+	return si.startLine < sj.startLine || si.startLine == sj.startLine && si.startCol < sj.startCol
 }
 
 // findChange find the expected change by file name.

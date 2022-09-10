@@ -126,7 +126,7 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 	}
 	m := make(map[string]*report.CoverageProfile)
 	fileCache := make(fileContentsCache)
-	for _, pkg := range *packages {
+	for _, pkg := range packages {
 		full.logger.Debugf("package: %s", pkg.Name)
 		full.ignoreProfiles = append(full.ignoreProfiles, pkg.IgnoreProfiles...)
 
