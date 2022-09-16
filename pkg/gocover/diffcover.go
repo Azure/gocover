@@ -109,9 +109,13 @@ func (diff *diffCover) Run(ctx context.Context) error {
 
 func (diff *diffCover) pass(statistics *report.Statistics) error {
 	if statistics.TotalCoveragePercent < diff.coverageBaseline {
-		return fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
-			diff.coverageBaseline,
-			statistics.TotalCoveragePercent,
+		return WrapErrorWithCode(
+			fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
+				diff.coverageBaseline,
+				statistics.TotalCoveragePercent,
+			),
+			LowCoverageErrorExitCode,
+			"",
 		)
 	}
 	return nil

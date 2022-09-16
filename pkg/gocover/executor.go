@@ -3,6 +3,7 @@ package gocover
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -106,7 +107,7 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 	logger.Infof("run unit tests: '%s'", testString)
 	if err := cmd.Run(); err != nil {
 		t.logger.WithError(err).Errorf(`run unit test '%s'`, testString)
-		return fmt.Errorf("unit test failed: %w", err)
+		return WrapErrorWithCode(errors.New("unit test failed"), UnitTestFailedErrorExitCode, "")
 	}
 
 	gocover, err := buildGoCover(t.mode, t.option, []string{coverFile}, logger)

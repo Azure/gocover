@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/Azure/gocover/pkg/cmd"
+	"github.com/Azure/gocover/pkg/gocover"
 )
 
 var (
@@ -20,6 +22,11 @@ var (
 func main() {
 	command := cmd.NewGoCoverCommand(version, commit, date)
 	if err := command.Execute(); err != nil {
-		os.Exit(1)
+		exitCode := gocover.GeneralErrorExitCode
+		var e *gocover.GoCoverError
+		if errors.As(err, &e) {
+			exitCode = e.ExitCode
+		}
+		os.Exit(exitCode)
 	}
 }

@@ -3,13 +3,14 @@ module github.com/Azure/gocover
 go 1.18
 
 require (
-	github.com/Azure/azure-kusto-go v0.7.0
+	github.com/Azure/azure-kusto-go v0.8.0
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.11
-	github.com/alecthomas/chroma/v2 v2.2.0
+	github.com/alecthomas/chroma/v2 v2.3.0
 	github.com/bmatcuk/doublestar/v4 v4.2.0
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.5.0
+	github.com/stretchr/testify v1.8.0
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 	golang.org/x/tools v0.1.12
 )
@@ -32,6 +33,7 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
@@ -47,6 +49,7 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
@@ -55,4 +58,5 @@ require (
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
