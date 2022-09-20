@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/cover"
@@ -88,6 +89,8 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 		IgnoreBlocks: make(map[cover.ProfileBlock]*IgnoreBlock),
 	}
 
+	sort.Sort(blocksByStart(coverProfile.Blocks))
+
 	totalLines := len(fileLines)
 	i := 0
 	for i < totalLines {
@@ -122,25 +125,39 @@ func parseIgnoreProfilesFromReader(rd io.Reader, coverProfile *cover.Profile) (*
 }
 
 // ignoreOnBlock finds the cover profile block that contains the ignore pattern text
-// and returns the line number of the end line of cover profile block
+// and returns the line number of the end line of cover profile block.
 func ignoreOnBlock(fileLines []string, profile *IgnoreProfile, coverProfile *cover.Profile, patternLineNumber int, patternText string, comments string) int {
-	var profileBlock *cover.ProfileBlock
+	if len(coverProfile.Blocks) == 0 {
+		return patternLineNumber + 1
+	}
 
-	// gocover ignore patterns are placed in block like following,
-	// so the line number of it >= start line of code block and <= end line of code block
-	// {  //+gocover:ignore:xxx comments
-	//    //+gocover:ignore:xxx comments
-	// }
-	for _, b := range coverProfile.Blocks {
-		if b.StartLine <= patternLineNumber && patternLineNumber < b.EndLine {
-			profileBlock = &b
+	idx := sort.Search(len(coverProfile.Blocks), func(i int) bool {
+		return coverProfile.Blocks[i].StartLine > patternLineNumber
+	})
+
+	switch idx {
+	case 0: // find no profile block, use the first one
+	default:
+		// Check the validate of the previous one, if annotation is among the previous one, use previous one,
+		// otherwise, keep current one because it meets the following case
+		// {
+		//    {
+		//	      fmt.Println(1)
+		//    }
+		//
+		//    // annotation here, should return following profile block
+		//    fmt.Println(2)
+		// }
+		if coverProfile.Blocks[idx-1].StartLine <= patternLineNumber && coverProfile.Blocks[idx-1].EndLine > patternLineNumber {
+			idx--
 			break
+		}
+		if idx == len(coverProfile.Blocks) {
+			return patternLineNumber + 1
 		}
 	}
 
-	if profileBlock == nil {
-		return patternLineNumber + 1
-	}
+	profileBlock := &coverProfile.Blocks[idx]
 
 	if _, ok := profile.IgnoreBlocks[*profileBlock]; !ok {
 		ignoreBlock := &IgnoreBlock{Annotation: patternText, Comments: comments, AnnotationLineNumber: patternLineNumber}
@@ -182,4 +199,13 @@ func parseIgnoreAnnotation(line string, lineNumber int) (string, string, error) 
 	}
 
 	return kind, trimmedComments, nil
+}
+
+type blocksByStart []cover.ProfileBlock
+
+func (b blocksByStart) Len() int      { return len(b) }
+func (b blocksByStart) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b blocksByStart) Less(i, j int) bool {
+	bi, bj := b[i], b[j]
+	return bi.StartLine < bj.StartLine || bi.StartLine == bj.StartLine && bi.StartCol < bj.StartCol
 }
