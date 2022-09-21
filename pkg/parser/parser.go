@@ -7,8 +7,10 @@ import (
 	"go/parser"
 	"go/token"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/gittool"
@@ -32,9 +34,11 @@ func NewParser(
 
 // Parser wrapper for parsing
 type Parser struct {
-	packages          map[string]*Package
-	packagesCache     packagesCache
 	coverProfileFiles []string
+
+	mu            sync.Mutex
+	packages      map[string]*Package
+	packagesCache packagesCache
 
 	logger logrus.FieldLogger
 }
@@ -65,6 +69,27 @@ func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
 	return result, nil
 }
 
+func (parser *Parser) convertProfileParallel(profiles []*cover.Profile, changes []*gittool.Change) error {
+	parallelism := runtime.NumCPU()
+	parser.logger.Debugf("parallelism: %d", parallelism)
+
+	c := make(chan *cover.Profile)
+	var wg sync.WaitGroup
+	wg.Add(parallelism)
+
+	for i := 1; i <= parallelism; i++ {
+
+	}
+
+	for _, f := range profiles {
+		c <- f
+	}
+
+	close(c)
+	wg.Wait()
+	return nil
+}
+
 // wrapper for Statement
 type statement struct {
 	*Statement
@@ -72,7 +97,7 @@ type statement struct {
 }
 
 func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) error {
-	file, pkgpath, err := findFile(parser.packagesCache, p.FileName)
+	file, pkgpath, err := parser.findFile(p.FileName)
 	if err != nil {
 		parser.logger.WithError(err).Error("find file")
 		return err
@@ -176,19 +201,22 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 }
 
 // findFile finds the location of the named file in GOROOT, GOPATH etc.
-func findFile(packages packagesCache, file string) (filename, pkgpath string, err error) {
+func (parser *Parser) findFile(file string) (filename, pkgpath string, err error) {
 	dir, file := filepath.Split(file)
 	if dir != "" {
 		dir = strings.TrimSuffix(dir, "/")
 	}
-	pkg, ok := packages[dir]
+
+	parser.mu.Lock()
+	pkg, ok := parser.packagesCache[dir]
 	if !ok {
 		pkg, err = build.Import(dir, ".", build.FindOnly)
 		if err != nil {
 			return "", "", fmt.Errorf("can't find %q: %w", file, err)
 		}
-		packages[dir] = pkg
+		parser.packagesCache[dir] = pkg
 	}
+	parser.mu.Unlock()
 
 	return filepath.Join(pkg.Dir, file), pkg.ImportPath, nil
 }
@@ -408,11 +436,11 @@ func isCodeLine(line string) bool {
 // It sort statements by startline first, then try to find first statement
 // that line number is greater than or equals the startline of the statement.
 // There are two edge cases:
-// 1. When line number is less than all the statements, `Search` function will return 0,
-//    but there is no suitable statement, should return immediately.
-// 2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
-//    then statement of that position minus one is the statement we want,
-//    but still need to check whether the changed line is among the statement scope.
+//  1. When line number is less than all the statements, `Search` function will return 0,
+//     but there is no suitable statement, should return immediately.
+//  2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
+//     then statement of that position minus one is the statement we want,
+//     but still need to check whether the changed line is among the statement scope.
 func (parser *Parser) setStatementsStateByLineNumber(changedlineNumber int, statements []*statement) {
 	idx := sort.Search(len(statements), func(i int) bool {
 		return statements[i].startLine > changedlineNumber
