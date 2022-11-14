@@ -15,6 +15,38 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func TestNewFullCover(t *testing.T) {
+	t.Run("NewFullCover", func(t *testing.T) {
+		dir := t.TempDir()
+		ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/Azure/gocover"), 0644)
+		option := &FullOption{
+			RepositoryPath: dir,
+			DbOption:       &dbclient.DBOption{},
+		}
+
+		_, err := NewFullCover(option)
+		if err != nil {
+			t.Errorf("should not return error, but get %s", err)
+		}
+	})
+}
+
+func TestNewDiffCover(t *testing.T) {
+	t.Run("NewDiffCover", func(t *testing.T) {
+		dir := t.TempDir()
+		ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/Azure/gocover"), 0644)
+		option := &DiffOption{
+			RepositoryPath: dir,
+			DbOption:       &dbclient.DBOption{},
+		}
+
+		_, err := NewDiffCover(option)
+		if err != nil {
+			t.Errorf("should not return error, but get %s", err)
+		}
+	})
+}
+
 func TestCalculateCoverage(t *testing.T) {
 	t.Run("calculateCoverage", func(t *testing.T) {
 		testSuites := []struct {

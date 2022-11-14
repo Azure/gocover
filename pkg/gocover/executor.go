@@ -95,7 +95,7 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 		},
 	)
 
-	coverFile := filepath.Join(t.outputDir, outCoverageProfile)
+	coverFile := filepath.Join(t.outputDir, "coverage.tmp.out")
 	testString := fmt.Sprintf("go test ./... -coverprofile %s -coverpkg=./... -v", coverFile)
 
 	cmd := exec.Command(t.executable, "test", "./...", "-coverprofile", coverFile, "-coverpkg=./...", "-v")
@@ -155,17 +155,11 @@ func (e *ginkgoTestExecutor) Run(ctx context.Context) error {
 		e.logger.Debugf("%s", f)
 	}
 
-	mergedFile, err := mergeCoverProfiles(e.outputDir, coverFiles)
-	if err != nil {
-		return fmt.Errorf("merge cover profiles: %w", err)
-	}
-
-	gocover, err := buildGoCover(e.mode, e.option, []string{mergedFile}, e.logger)
+	gocover, err := buildGoCover(e.mode, e.option, coverFiles, e.logger)
 	if err != nil {
 		return err
 	}
 
-	e.logger.Infof("cover profile: %s", mergedFile)
 	if err := gocover.Run(ctx); err != nil {
 		err := fmt.Errorf("run gocover: %w", err)
 		e.logger.WithError(err).Error()
