@@ -43,26 +43,11 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		return nil, fmt.Errorf("parse go module path: %w", err)
 	}
 
-	if o.OutputDir == "" {
-		dir, err := createGoCoverTempDirectory()
-		if err != nil {
-			return nil, fmt.Errorf("create gocover temp directory: %w", err)
-		}
-		o.OutputDir = dir
-	}
-
-	mergedCoverFile, err := mergeCoverProfiles(o.OutputDir, o.CoverProfiles)
-	if err != nil {
-		return nil, fmt.Errorf("merge cover profiles: %w", err)
-	}
-
-	logger.Infof("cover profile: %s", mergedCoverFile)
-
 	logger.Debugf("repository path: %s, module path: %s, output dir: %s, exclude patterns: %s",
 		repositoryAbsPath, modulePath, o.OutputDir, o.Excludes)
 
 	return &fullCover{
-		coverFilenames:  []string{mergedCoverFile},
+		coverFilenames:  o.CoverProfiles,
 		modulePath:      modulePath,
 		repositoryPath:  repositoryAbsPath,
 		excludeFiles:    make(excludeFileCache),
