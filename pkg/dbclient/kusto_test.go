@@ -2,6 +2,7 @@ package dbclient
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"io"
 	"os"
@@ -74,7 +75,8 @@ func TestKustoOptionValidate(t *testing.T) {
 			t.Errorf("should success, but get %s", err)
 		}
 
-		failedColumns := []string{"buildID", "buildID::123456", ":int:123456", "::"}
+		// failedColumns := []string{"buildID", "buildID::123456", ":int:123456", "::"}
+		failedColumns := []string{"YnVpbGRJRA==", "YnVpbGRJRDo6MTIzNDU2", "OmludDoxMjM0NTY=", "Ojo="}
 		for _, col := range failedColumns {
 			o.CustomColumns = []string{col}
 			if err := o.Validate(); err == nil {
@@ -82,7 +84,18 @@ func TestKustoOptionValidate(t *testing.T) {
 			}
 		}
 
-		succeededColumns := []string{"buildID:string:123456", "buildID:string:", "buildID:string"}
+		// succeededColumns := []string{"buildID:string:123456", "buildID:string:", "buildID:string"}
+		succeededColumns := []string{"YnVpbGRJRDpzdHJpbmc6MTIzNDU2", "YnVpbGRJRDpzdHJpbmc6", "YnVpbGRJRDpzdHJpbmc="}
+		originalString := []string{"buildID:string:123456", "buildID:string:", "buildID:string"}
+		for i, col := range succeededColumns {
+			decColumn, err := base64.StdEncoding.DecodeString(col)
+			if err != nil {
+				t.Errorf("no error, but get error: %s", err)
+			}
+			if originalString[i] != string(decColumn) {
+				t.Errorf("expect %s, but get %s", originalString[i], string(decColumn))
+			}
+		}
 		for _, col := range succeededColumns {
 			o.CustomColumns = []string{col}
 			if err := o.Validate(); err != nil {

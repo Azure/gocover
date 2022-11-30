@@ -5,6 +5,7 @@ package dbclient
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,8 +187,15 @@ func (o *KustoOption) Validate() error {
 	// token 0: column name
 	// token 1: datatype
 	// token 2: column value
-	for _, m := range o.CustomColumns {
-		tokens := strings.Split(m, Separator)
+	for _, col := range o.CustomColumns {
+		decColumn, err := base64.StdEncoding.DecodeString(col)
+		if err != nil {
+			return fmt.Errorf("invalid base64: %w", err)
+		}
+
+		m := string(decColumn)
+
+		tokens := strings.Split(string(decColumn), Separator)
 		if len(tokens) < 2 {
 			return fmt.Errorf("%s %w", m, ErrFormatCustomColumn)
 		}
