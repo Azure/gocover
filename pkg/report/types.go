@@ -28,6 +28,8 @@ type Statistics struct {
 	TotalViolationLines int
 	// TotalCoveragePercent represents the coverage percent for current diff.
 	TotalCoveragePercent float64
+	// TotalCoverageWithoutIgnore represents the coverage percent for current diff without ignorance
+	TotalCoverageWithoutIgnore float64
 	// CoverageProfile represents the coverage profile for a specific file.
 	CoverageProfile []*CoverageProfile
 	// StatisticsType indicates which type the Statistics is.

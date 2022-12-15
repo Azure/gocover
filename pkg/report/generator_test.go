@@ -120,6 +120,12 @@ func TestGenerateReport(t *testing.T) {
 		if !strings.Contains(string(data), "Diff Coverage") {
 			t.Error("report header should contain 'Diff Coverage'")
 		}
+		if !strings.Contains(string(data), "Coverage (with ignorance)") {
+			t.Errorf("report should contain Coverage (with ignorance)")
+		}
+		if !strings.Contains(string(data), "Coverage") {
+			t.Errorf("report should contain Coverage")
+		}
 		if !strings.Contains(string(data), "Exclude Files") {
 			t.Error("report should contain 'Exclude Files' header")
 		}
@@ -192,7 +198,13 @@ func TestGenerateReport(t *testing.T) {
 
 		reportString := string(data)
 		if !strings.Contains(string(data), "Full Coverage") {
-			t.Error("report header should contain 'Diff Coverage'")
+			t.Error("report header should contain 'Full Coverage'")
+		}
+		if !strings.Contains(string(data), "Coverage (with ignorance)") {
+			t.Errorf("report should contain Coverage (with ignorance)")
+		}
+		if !strings.Contains(string(data), "Coverage") {
+			t.Errorf("report should contain Coverage")
 		}
 		for _, v := range []string{"foo", "bar", "zoo", "text1", "text2", "text3", "foo.txt", "bar.txt"} {
 			if !strings.Contains(reportString, v) {

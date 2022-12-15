@@ -109,9 +109,13 @@ func TestReBuildStatistics(t *testing.T) {
 		cache := excludeFileCache{"github.com/Azure/gocover/pkg/foo/foo.go": true}
 		reBuildStatistics(s, cache)
 
-		expectCveragePercent := calculateCoverage(30+15, 40+50)
-		if s.TotalCoveragePercent != expectCveragePercent {
-			t.Errorf("expect coverage percent %f, but get %f", expectCveragePercent, s.TotalCoveragePercent)
+		expectCoveragePercent := calculateCoverage(30+15, 40+50)
+		if s.TotalCoveragePercent != expectCoveragePercent {
+			t.Errorf("expect coverage percent %f, but get %f", expectCoveragePercent, s.TotalCoveragePercent)
+		}
+		expectCoveragePercentWithoutIgnore := calculateCoverage(30+15, 50+50)
+		if s.TotalCoverageWithoutIgnore != expectCoveragePercentWithoutIgnore {
+			t.Errorf("expect coverage percent %f, but get %f", expectCoveragePercentWithoutIgnore, s.TotalCoverageWithoutIgnore)
 		}
 		expectTotal := 50 + 50
 		if s.TotalLines != expectTotal {

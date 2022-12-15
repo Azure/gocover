@@ -70,6 +70,10 @@ func reBuildStatistics(s *report.Statistics, cache excludeFileCache) {
 		int64(s.TotalCoveredLines),
 		int64(s.TotalEffectiveLines),
 	)
+	s.TotalCoverageWithoutIgnore = calculateCoverage(
+		int64(s.TotalCoveredLines),
+		int64(s.TotalLines),
+	)
 
 	for f := range cache {
 		s.ExcludeFiles = append(s.ExcludeFiles, f)

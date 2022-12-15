@@ -141,14 +141,6 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 	blocks := p.Blocks
 	for _, s := range stmts {
 
-		// ignore all statements when meet file ignore annotation
-		if ignoreProfile != nil && ignoreProfile.Type == annotation.FILE_IGNORE {
-			s.Mode = Ignore
-			s.Reached = 1
-			parser.logger.Debugf("hit file ignore on [%s], ignore statement at line %d", file, s.startLine)
-			continue
-		}
-
 		for i, b := range blocks {
 			if b.StartLine > s.endLine || (b.StartLine == s.endLine && b.StartCol >= s.endCol) {
 				// Past the end of the statement
@@ -159,12 +151,20 @@ func (parser *Parser) convertProfile(p *cover.Profile, change *gittool.Change) e
 				// Before the beginning of the statement
 				continue
 			}
+
 			s.Reached += int64(b.Count)
 
-			// ignore those statements when block annotated with block ignore annotation
-			if _, ok := ignoreProfile.IgnoreBlocks[b]; ok {
-				s.Mode = Ignore
-				parser.logger.Debugf("hit block ignore on [%s], ignore statement at line %d", file, s.startLine)
+			if ignoreProfile != nil {
+				if ignoreProfile.Type == annotation.FILE_IGNORE {
+					s.Mode = Ignore
+					parser.logger.Debugf("hit file ignore on [%s], ignore statement at line %d", file, s.startLine)
+				} else {
+					// ignore those statements when block annotated with block ignore annotation
+					if _, ok := ignoreProfile.IgnoreBlocks[b]; ok {
+						s.Mode = Ignore
+						parser.logger.Debugf("hit block ignore on [%s], ignore statement at line %d", file, s.startLine)
+					}
+				}
 			}
 
 			break

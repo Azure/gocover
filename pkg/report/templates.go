@@ -67,12 +67,16 @@ var htmlCoverageReport = "" +
                 <b>Ignored</b>: {{ NormalizeLines .TotalIgnoredLines }}
             </li>
             <li>
-                <b>Coverage</b>: {{ .TotalCoveragePercent }}%
+                <b>Coverage</b>: {{ .TotalCoverageWithoutIgnore }}%
+            </li>
+            <li>
+                <b>Coverage (with ignorance)</b>: {{ .TotalCoveragePercent }}%
             </li>
         </ul>
 
         <p>
-            <b>Coverage</b> = Covered / Effective <br />
+            <b>Coverage </b> = Covered / Total <br />
+            <b>Coverage (with ignorance) </b> = Covered / Effective <br />
             <b>Total</b> = Effective + Ignored
         </p>
 
@@ -81,9 +85,11 @@ var htmlCoverageReport = "" +
                 <tr>
                     <th>Source File</th>
                     {{ if IsFullCoverageReport .StatisticsType }}
+                        <th>Full Coverage (with ignorance) (%)</th>
                         <th>Full Coverage (%)</th>
                     {{ end }}
                     {{ if IsDiffCoverageReport .StatisticsType }}
+                        <th>Diff Coverage (with ignorance) (%)</th>
                         <th>Diff Coverage (%)</th>
                     {{ end }}
                     <th>Covered Lines</th>
@@ -97,6 +103,7 @@ var htmlCoverageReport = "" +
                 <tr>
                     <td><a href="#{{.FileName}}">{{ .FileName }}</a></td>
                     <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines }}</td>
+                    <td>{{ PercentCovered .TotalLines .CoveredLines }}</td>
                     <td>{{ .CoveredLines }}</td>
                     <td>{{ .TotalIgnoredLines }}</td>
                     <td>{{ .TotalEffectiveLines }}</td>
