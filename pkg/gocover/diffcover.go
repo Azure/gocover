@@ -218,7 +218,6 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 				if st.Mode == parser.Ignore {
 					diff.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
 					ignored++
-					continue
 				}
 				if st.Reached > 0 {
 					covered++

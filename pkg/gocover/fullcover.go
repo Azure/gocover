@@ -182,7 +182,6 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 					full.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
 					ignored++
 					node.TotalIgnoredLines += 1
-					continue
 				}
 				if st.Reached > 0 {
 					node.TotalCoveredLines += 1
