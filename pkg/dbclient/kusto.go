@@ -9,9 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
@@ -30,6 +30,9 @@ const (
 	tenantIDKey     string = "KUSTO_TENANT_ID"
 	clientIDKey     string = "KUSTO_CLIENT_ID"
 	clientSecretKey string = "KUSTO_CLIENT_SECRET"
+
+	DEFAULT_MAX_RETRY                = 5
+	DEFAULT_RETRY_TIMEOUT_IN_SECONDS = 10 * time.Second
 
 	Separator = ":"
 )
@@ -79,7 +82,7 @@ type KustoClient struct {
 var _ DbClient = (*KustoClient)(nil)
 
 func (client *KustoClient) StoreCoverageDataFromFile(ctx context.Context, data []*CoverageData) error {
-	file, err := ioutil.TempFile("", "coveragedata")
+	file, err := os.CreateTemp("", "coveragedata")
 	if err != nil {
 		return err
 	}
@@ -111,18 +114,11 @@ func (client *KustoClient) StoreCoverageDataFromFile(ctx context.Context, data [
 		return fmt.Errorf("mappings json marshal: %w", err)
 	}
 
-	_, err = client.coverageIngestor.FromFile(
-		ctx, file.Name(),
-		ingest.FileFormat(ingest.JSON),
-		ingest.IngestionMapping(mappingsBytes, ingest.JSON),
-	)
-
-	client.logger.Debugf("send coverage data file %s to kusto", file.Name())
-	return err
+	return ingestFileWithRetry(ctx, client.logger, client.coverageIngestor, file.Name(), string(mappingsBytes), DEFAULT_MAX_RETRY)
 }
 
 func (client *KustoClient) StoreIgnoreProfileDataFromFile(ctx context.Context, data []*IgnoreProfileData) error {
-	file, err := ioutil.TempFile("", "ignoreprofiledata")
+	file, err := os.CreateTemp("", "ignoreprofiledata")
 	if err != nil {
 		return err
 	}
@@ -154,13 +150,46 @@ func (client *KustoClient) StoreIgnoreProfileDataFromFile(ctx context.Context, d
 		return fmt.Errorf("mappings json marshal: %w", err)
 	}
 
-	_, err = client.ignoreIngestor.FromFile(
-		ctx, file.Name(),
-		ingest.FileFormat(ingest.JSON),
-		ingest.IngestionMapping(mappingsBytes, ingest.JSON),
-	)
-	client.logger.Debugf("send ignore profile data file %s to kusto", file.Name())
-	return err
+	return ingestFileWithRetry(ctx, client.logger, client.ignoreIngestor, file.Name(), string(mappingsBytes), DEFAULT_MAX_RETRY)
+}
+
+func ingestFileWithRetry(ctx context.Context, logger logrus.FieldLogger, ingestor ingest.Ingestor, dataFilePath, mappings string, retryLimit int) error {
+
+	for retryCount := 0; retryCount < retryLimit; retryCount++ {
+		logger.Infof("ingestion %s starting", dataFilePath)
+		result, err := ingestor.FromFile(
+			ctx, dataFilePath,
+			ingest.FileFormat(ingest.JSON),
+			ingest.IngestionMapping(mappings, ingest.JSON),
+			ingest.ReportResultToTable(),
+		)
+		if err != nil {
+			logger.WithError(err).Errorf("failed to create Kusto client, will retry in %s", DEFAULT_RETRY_TIMEOUT_IN_SECONDS)
+			time.Sleep(DEFAULT_RETRY_TIMEOUT_IN_SECONDS)
+			retryCount++
+			continue
+		}
+
+		err = <-result.Wait(ctx)
+		if err != nil {
+			// the operation complete with an error
+			if ingest.IsRetryable(err) {
+				// Handle retries
+				logger.WithError(err).
+					Errorf("Failed to create Kusto client, will retry in %s", DEFAULT_RETRY_TIMEOUT_IN_SECONDS)
+				time.Sleep(DEFAULT_RETRY_TIMEOUT_IN_SECONDS)
+				retryCount++
+				continue
+			} else {
+				logger.WithError(err).Errorf("Failed to create Kusto client, error is not retriable")
+				return err
+			}
+		}
+		logger.Infof("Ingestion %s completed", dataFilePath)
+		return nil
+	}
+
+	return fmt.Errorf("max ingestion retries count %d reached", retryLimit)
 }
 
 func (client *KustoClient) StoreCoverageData(ctx context.Context, data *CoverageData) error {
