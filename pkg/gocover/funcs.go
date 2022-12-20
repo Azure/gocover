@@ -96,8 +96,10 @@ func formatFilePath(rootRepoPath, fileNamePath, modulePath string) string {
 // storeCoverageData send all coverage results to db store
 func storeCoverageData(ctx context.Context, dbClient dbclient.DbClient, all []*report.AllInformation, coverageMode CoverageMode, modulePath string) error {
 	now := time.Now().UTC()
+
+	var data []*dbclient.CoverageData
 	for _, info := range all {
-		err := dbClient.StoreCoverageData(ctx, &dbclient.CoverageData{
+		d := &dbclient.CoverageData{
 			PreciseTimestamp: now,
 			TotalLines:       info.TotalLines,
 			EffectiveLines:   info.TotalEffectiveLines,
@@ -107,36 +109,36 @@ func storeCoverageData(ctx context.Context, dbClient dbclient.DbClient, all []*r
 			FilePath:         info.Path,
 			Coverage:         calculateCoverage(info.TotalCoveredLines, info.TotalEffectiveLines),
 			CoverageMode:     string(coverageMode),
-		})
-		if err != nil {
-			return err
 		}
+		data = append(data, d)
 	}
 
-	return nil
+	return dbClient.StoreCoverageDataFromFile(ctx, data)
 }
 
 func storeIgnoreProfileData(ctx context.Context, dbClient dbclient.DbClient, ignoreProfiles []*annotation.IgnoreProfile, coverageMode CoverageMode, modulePath string, repositoryPath string, moduleDir string) error {
 	now := time.Now().UTC()
+
+	var data []*dbclient.IgnoreProfileData
 	for _, profile := range ignoreProfiles {
 		formattedFilePath := filepath.Join(modulePath, strings.TrimPrefix(profile.Filename, filepath.Join(repositoryPath, moduleDir)))
 		if profile.Type == annotation.FILE_IGNORE {
-			err := dbClient.StoreIgnoreProfileData(ctx, &dbclient.IgnoreProfileData{
+
+			d := &dbclient.IgnoreProfileData{
 				PreciseTimestamp: now,
 				FilePath:         formattedFilePath,
 				ModulePath:       modulePath,
 				IgnoreType:       string(profile.Type),
 				Comments:         profile.Comments,
 				Annotation:       profile.Annotation,
-			})
-			if err != nil {
-				return err
 			}
+			data = append(data, d)
+
 			continue
 		}
 
 		for _, block := range profile.IgnoreBlocks {
-			err := dbClient.StoreIgnoreProfileData(ctx, &dbclient.IgnoreProfileData{
+			d := &dbclient.IgnoreProfileData{
 				PreciseTimestamp: now,
 				FilePath:         formattedFilePath,
 				ModulePath:       modulePath,
@@ -147,14 +149,12 @@ func storeIgnoreProfileData(ctx context.Context, dbClient dbclient.DbClient, ign
 				Comments:         block.Comments,
 				Annotation:       block.Annotation,
 				Contents:         strings.Join(block.Contents, "\n"),
-			})
-			if err != nil {
-				return err
 			}
+			data = append(data, d)
 		}
 	}
 
-	return nil
+	return dbClient.StoreIgnoreProfileDataFromFile(ctx, data)
 }
 
 // dump outputs all coverage results

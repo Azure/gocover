@@ -18,6 +18,8 @@ const (
 
 // DbClient interface for storing gocover data.
 type DbClient interface {
+	StoreCoverageDataFromFile(ctx context.Context, data []*CoverageData) error
+	StoreIgnoreProfileDataFromFile(ctx context.Context, data []*IgnoreProfileData) error
 	StoreCoverageData(context context.Context, data *CoverageData) error
 	StoreIgnoreProfileData(context context.Context, data *IgnoreProfileData) error
 }
