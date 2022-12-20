@@ -184,8 +184,10 @@ func foo() {
 }
 
 type mockDbClient struct {
-	storeCoverageDataFn      func(context context.Context, data *dbclient.CoverageData) error
-	storeIgnoreProfileDataFn func(context context.Context, data *dbclient.IgnoreProfileData) error
+	storeCoverageDataFn              func(ctx context.Context, data *dbclient.CoverageData) error
+	storeIgnoreProfileDataFn         func(ctx context.Context, data *dbclient.IgnoreProfileData) error
+	storeCoverageDataFromFileFn      func(ctx context.Context, data []*dbclient.CoverageData) error
+	storeIgnoreProfileDataFromFileFn func(ctx context.Context, data []*dbclient.IgnoreProfileData) error
 }
 
 func (client *mockDbClient) StoreCoverageData(context context.Context, data *dbclient.CoverageData) error {
@@ -196,10 +198,18 @@ func (client *mockDbClient) StoreIgnoreProfileData(context context.Context, data
 	return client.storeIgnoreProfileDataFn(context, data)
 }
 
+func (client *mockDbClient) StoreCoverageDataFromFile(ctx context.Context, data []*dbclient.CoverageData) error {
+	return client.storeCoverageDataFromFileFn(ctx, data)
+}
+
+func (client *mockDbClient) StoreIgnoreProfileDataFromFile(ctx context.Context, data []*dbclient.IgnoreProfileData) error {
+	return client.storeIgnoreProfileDataFromFileFn(ctx, data)
+}
+
 func TestStore(t *testing.T) {
 	t.Run("store successfully", func(t *testing.T) {
 		client := &mockDbClient{
-			storeCoverageDataFn: func(context context.Context, data *dbclient.CoverageData) error {
+			storeCoverageDataFromFileFn: func(ctx context.Context, data []*dbclient.CoverageData) error {
 				return nil
 			},
 		}
@@ -212,16 +222,11 @@ func TestStore(t *testing.T) {
 		if err != nil {
 			t.Errorf("should return nil, but get error: %s", err)
 		}
-
-		err = storeCoverageData(context.Background(), client, nil, FullCoverage, "")
-		if err != nil {
-			t.Errorf("should return nil, but get error: %s", err)
-		}
 	})
 
 	t.Run("store failed", func(t *testing.T) {
 		client := &mockDbClient{
-			storeCoverageDataFn: func(context context.Context, data *dbclient.CoverageData) error {
+			storeCoverageDataFromFileFn: func(ctx context.Context, data []*dbclient.CoverageData) error {
 				return errors.New("unexpected error")
 			},
 		}

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -76,6 +77,91 @@ type KustoClient struct {
 }
 
 var _ DbClient = (*KustoClient)(nil)
+
+func (client *KustoClient) StoreCoverageDataFromFile(ctx context.Context, data []*CoverageData) error {
+	file, err := ioutil.TempFile("", "coveragedata")
+	if err != nil {
+		return err
+	}
+
+	for _, d := range data {
+		d.Extra = client.extraData
+		contents, err := json.Marshal(&d)
+		if err != nil {
+			return err
+		}
+		if _, err := file.Write(contents); err != nil {
+			return err
+		}
+		if _, err := file.Write([]byte("\n")); err != nil {
+			return err
+		}
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	defer func() {
+		client.logger.Debugf("clean coverage data file %s", file.Name())
+		_ = os.Remove(file.Name())
+	}()
+
+	mappings := append(basicCoverageMappings, client.mappings...)
+	mappingsBytes, err := json.Marshal(mappings)
+	if err != nil {
+		return fmt.Errorf("mappings json marshal: %w", err)
+	}
+
+	_, err = client.coverageIngestor.FromFile(
+		ctx, file.Name(),
+		ingest.FileFormat(ingest.JSON),
+		ingest.IngestionMapping(mappingsBytes, ingest.JSON),
+	)
+
+	client.logger.Debugf("send coverage data file %s to kusto", file.Name())
+	return err
+}
+
+func (client *KustoClient) StoreIgnoreProfileDataFromFile(ctx context.Context, data []*IgnoreProfileData) error {
+	file, err := ioutil.TempFile("", "ignoreprofiledata")
+	if err != nil {
+		return err
+	}
+
+	for _, d := range data {
+		d.Extra = client.extraData
+		contents, err := json.Marshal(&d)
+		if err != nil {
+			return err
+		}
+		if _, err := file.Write(contents); err != nil {
+			return err
+		}
+		if _, err := file.Write([]byte("\n")); err != nil {
+			return err
+		}
+	}
+	if err := file.Close(); err != nil {
+		return err
+	}
+	defer func() {
+		client.logger.Debugf("clean ignore profile data file %s", file.Name())
+		_ = os.Remove(file.Name())
+	}()
+
+	mappings := append(basicIgnoreProfileMappings, client.mappings...)
+	mappingsBytes, err := json.Marshal(mappings)
+	if err != nil {
+		return fmt.Errorf("mappings json marshal: %w", err)
+	}
+
+	_, err = client.ignoreIngestor.FromFile(
+		ctx, file.Name(),
+		ingest.FileFormat(ingest.JSON),
+		ingest.IngestionMapping(mappingsBytes, ingest.JSON),
+	)
+	client.logger.Debugf("send ignore profile data file %s to kusto", file.Name())
+	return err
+}
 
 func (client *KustoClient) StoreCoverageData(ctx context.Context, data *CoverageData) error {
 	data.Extra = client.extraData
