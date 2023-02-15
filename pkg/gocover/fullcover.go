@@ -6,12 +6,14 @@ import (
 	"go/build"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/dbclient"
 	"github.com/Azure/gocover/pkg/parser"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 )
 
 func NewFullCover(o *FullOption) (GoCover, error) {
@@ -116,95 +118,138 @@ func (full *fullCover) dump(ctx context.Context) error {
 }
 
 func (full *fullCover) generateStatistics() (*report.Statistics, error) {
-	packages, err := parser.NewParser(full.coverFilenames, full.logger).Parse(nil)
+	coverParser, err := parser.NewParser(full.coverFilenames, full.logger)
 	if err != nil {
 		return nil, err
+	}
+	packages, err := coverParser.Parse(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	lock := new(sync.Mutex)
+	wg := new(sync.WaitGroup)
+	errorChannel := make(chan error, len(packages))
+
+	coverProfileChannel := make(chan []*report.CoverageProfile, len(packages))
+
+	for _, pkg := range packages {
+		wg.Add(1)
+
+		go func(pkg *parser.Package) {
+			defer wg.Done()
+
+			m := make(map[string]*report.CoverageProfile)
+			fileCache := make(fileContentsCache)
+
+			full.logger.Debugf("package: %s", pkg.Name)
+			full.ignoreProfiles = append(full.ignoreProfiles, pkg.IgnoreProfiles...)
+
+			p, err := build.Import(pkg.Name, ".", build.FindOnly)
+			if err != nil {
+				errorChannel <- fmt.Errorf("build import %w", err)
+				return
+			}
+
+			var coverProfiles []*report.CoverageProfile
+
+			for _, fun := range pkg.Functions {
+
+				if ok := inExclueds(
+					full.excludeFiles,
+					full.excludePatterns,
+					formatFilePath(p.Root, fun.File, full.modulePath),
+					full.logger,
+				); ok {
+					continue
+				}
+
+				// extract into single function
+				coverProfile, ok := m[fun.File]
+				if !ok {
+					coverProfile = &report.CoverageProfile{
+						FileName: formatFilePath(p.Root, fun.File, full.modulePath),
+					}
+					m[fun.File] = coverProfile
+					coverProfiles = append(coverProfiles, coverProfile)
+				}
+
+				fileContents, err := findFileContents(fileCache, fun.File)
+				if err != nil {
+					errorChannel <- fmt.Errorf("find file contents: %w", err)
+					return
+				}
+
+				section := &report.ViolationSection{
+					StartLine: fun.StartLine,
+					EndLine:   fun.EndLine,
+				}
+
+				for i := fun.StartLine; i <= fun.EndLine; i++ {
+					section.Contents = append(section.Contents, fileContents[i-1])
+				}
+
+				lock.Lock()
+				node := full.coverageTree.FindOrCreate(strings.TrimPrefix(fun.File, p.Root))
+
+				var total, ignored, covered int
+				violated := false
+				for _, st := range fun.Statements {
+					total += 1
+					node.TotalLines += 1
+
+					if st.Mode == parser.Ignore {
+						full.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
+						ignored++
+						node.TotalIgnoredLines += 1
+					}
+					if st.Reached > 0 {
+						node.TotalCoveredLines += 1
+						covered++
+					} else {
+						section.ViolationLines = append(section.ViolationLines, st.StartLine)
+						violated = true
+					}
+
+				}
+
+				node.TotalEffectiveLines = node.TotalLines - node.TotalIgnoredLines
+				lock.Unlock()
+
+				coverProfile.TotalLines += total
+				coverProfile.CoveredLines += covered
+				coverProfile.TotalEffectiveLines += (total - ignored)
+				coverProfile.TotalIgnoredLines += ignored
+				coverProfile.TotalViolationLines = append(coverProfile.TotalViolationLines, section.ViolationLines...)
+				if violated {
+					coverProfile.ViolationSections = append(coverProfile.ViolationSections, section)
+				}
+			}
+
+			errorChannel <- nil
+			coverProfileChannel <- coverProfiles
+
+		}(pkg)
+
+	}
+
+	wg.Wait()
+
+	var finalErr error
+	for i := 0; i < len(packages); i++ {
+		finalErr = multierr.Append(finalErr, <-errorChannel)
+	}
+
+	if finalErr != nil {
+		return nil, finalErr
 	}
 
 	statistics := &report.Statistics{
 		StatisticsType: report.FullStatisticsType,
 	}
-	m := make(map[string]*report.CoverageProfile)
-	fileCache := make(fileContentsCache)
-	for _, pkg := range packages {
-		full.logger.Debugf("package: %s", pkg.Name)
-		full.ignoreProfiles = append(full.ignoreProfiles, pkg.IgnoreProfiles...)
 
-		p, err := build.Import(pkg.Name, ".", build.FindOnly)
-		if err != nil {
-			return nil, fmt.Errorf("build import %w", err)
-		}
-
-		for _, fun := range pkg.Functions {
-
-			if ok := inExclueds(
-				full.excludeFiles,
-				full.excludePatterns,
-				formatFilePath(p.Root, fun.File, full.modulePath),
-				full.logger,
-			); ok {
-				continue
-			}
-
-			// extract into single function
-			coverProfile, ok := m[fun.File]
-			if !ok {
-				coverProfile = &report.CoverageProfile{
-					FileName: formatFilePath(p.Root, fun.File, full.modulePath),
-				}
-				m[fun.File] = coverProfile
-				statistics.CoverageProfile = append(statistics.CoverageProfile, coverProfile)
-			}
-
-			fileContents, err := findFileContents(fileCache, fun.File)
-			if err != nil {
-				return nil, fmt.Errorf("find file contents: %w", err)
-			}
-
-			section := &report.ViolationSection{
-				StartLine: fun.StartLine,
-				EndLine:   fun.EndLine,
-			}
-
-			for i := fun.StartLine; i <= fun.EndLine; i++ {
-				section.Contents = append(section.Contents, fileContents[i-1])
-			}
-
-			node := full.coverageTree.FindOrCreate(strings.TrimPrefix(fun.File, p.Root))
-
-			var total, ignored, covered int
-			violated := false
-			for _, st := range fun.Statements {
-				total += 1
-				node.TotalLines += 1
-
-				if st.Mode == parser.Ignore {
-					full.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
-					ignored++
-					node.TotalIgnoredLines += 1
-				}
-				if st.Reached > 0 {
-					node.TotalCoveredLines += 1
-					covered++
-				} else {
-					section.ViolationLines = append(section.ViolationLines, st.StartLine)
-					violated = true
-				}
-
-			}
-
-			node.TotalEffectiveLines = node.TotalLines - node.TotalIgnoredLines
-
-			coverProfile.TotalLines += total
-			coverProfile.CoveredLines += covered
-			coverProfile.TotalEffectiveLines += (total - ignored)
-			coverProfile.TotalIgnoredLines += ignored
-			coverProfile.TotalViolationLines = append(coverProfile.TotalViolationLines, section.ViolationLines...)
-			if violated {
-				coverProfile.ViolationSections = append(coverProfile.ViolationSections, section)
-			}
-		}
-
+	for i := 0; i < len(packages); i++ {
+		statistics.CoverageProfile = append(statistics.CoverageProfile, <-coverProfileChannel...)
 	}
 
 	full.coverageTree.CollectCoverageData()

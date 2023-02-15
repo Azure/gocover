@@ -9,10 +9,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 	"golang.org/x/tools/cover"
 )
 
@@ -21,13 +24,92 @@ type packagesCache map[string]*build.Package
 func NewParser(
 	coverProfileFiles []string,
 	logger logrus.FieldLogger,
-) *Parser {
+) (*Parser, error) {
+
+	packagesCache := make(packagesCache)
+	packages := make(map[string]*Package)
+	coverProfiles := make(map[string][]*cover.Profile)
+
+	for _, coverProfileFile := range coverProfileFiles {
+		now1 := time.Now()
+		profiles, err := cover.ParseProfiles(coverProfileFile)
+		if err != nil {
+			logger.WithError(err).Error("parse cover profile")
+			return nil, err
+		}
+		now2 := time.Now()
+		fmt.Printf("TIME 1: %v\n", now2.Sub(now1).Seconds())
+
+		coverProfiles[coverProfileFile] = profiles
+
+		lock := new(sync.Mutex)
+		wg := new(sync.WaitGroup)
+		errorChannel := make(chan error, len(profiles))
+
+		for _, profile := range profiles {
+			wg.Add(1)
+			go func(fileName string) {
+				defer wg.Done()
+
+				dir, file := filepath.Split(fileName)
+				if dir != "" {
+					dir = strings.TrimSuffix(dir, "/")
+				}
+
+				lock.Lock()
+				_, ok := packagesCache[dir]
+				if !ok {
+					pkg, err := build.Import(dir, ".", build.FindOnly)
+					if err != nil {
+						errorChannel <- fmt.Errorf("can't find %q: %w", file, err)
+						return
+					}
+					packagesCache[dir] = pkg
+					packages[pkg.ImportPath] = &Package{Name: pkg.ImportPath}
+				}
+				lock.Unlock()
+
+				errorChannel <- nil
+
+			}(profile.FileName)
+
+			// dir, file := filepath.Split(profile.FileName)
+			// if dir != "" {
+			// 	dir = strings.TrimSuffix(dir, "/")
+			// }
+			// _, ok := packagesCache[dir]
+			// if !ok {
+			// 	pkg, err := build.Import(dir, ".", build.FindOnly)
+			// 	if err != nil {
+			// 		return nil, fmt.Errorf("can't find %q: %w", file, err)
+			// 	}
+			// 	packagesCache[dir] = pkg
+			// 	packages[pkg.ImportPath] = &Package{Name: pkg.ImportPath}
+			// }
+		}
+
+		wg.Wait()
+
+		var finalErr error
+		for i := 0; i < len(packages); i++ {
+			finalErr = multierr.Append(finalErr, <-errorChannel)
+		}
+
+		if finalErr != nil {
+			return nil, finalErr
+		}
+
+		now3 := time.Now()
+		fmt.Printf("TIME 2: %v\n", now3.Sub(now2).Seconds())
+	}
+
 	return &Parser{
 		coverProfileFiles: coverProfileFiles,
-		packages:          make(map[string]*Package),
-		packagesCache:     make(packagesCache),
+		packages:          packages,
+		packagesCache:     packagesCache,
+		coverProfiles:     coverProfiles,
 		logger:            logger.WithField("source", "Parser"),
-	}
+	}, nil
 }
 
 // Parser wrapper for parsing
@@ -35,6 +117,7 @@ type Parser struct {
 	packages          map[string]*Package
 	packagesCache     packagesCache
 	coverProfileFiles []string
+	coverProfiles     map[string][]*cover.Profile
 
 	logger logrus.FieldLogger
 }
@@ -43,23 +126,39 @@ type Parser struct {
 func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
 	var result Packages
 
-	for _, coverProfile := range parser.coverProfileFiles {
+	var wg sync.WaitGroup
+	errorsChannel := make(chan error, len(parser.coverProfiles))
 
-		profiles, err := cover.ParseProfiles(coverProfile)
-		if err != nil {
-			parser.logger.WithError(err).Error("parse cover profile")
-			return nil, err
-		}
-		for _, p := range profiles {
-			if err := parser.convertProfile(p, findChange(p, changes)); err != nil {
-				parser.logger.WithError(err).Error("covert cover profile")
-				return nil, err
+	for f, coverProfiles := range parser.coverProfiles {
+		wg.Add(1)
+		go func(profiles []*cover.Profile, f string) {
+			defer wg.Done()
+			parser.logger.Debugf("handle cover profile: %s", f)
+			var err error
+			for _, profile := range profiles {
+				err := parser.convertProfile(profile, findChange(profile, changes))
+				if err != nil {
+					parser.logger.WithError(err).Error("covert cover profile")
+					break
+				}
 			}
-		}
+			errorsChannel <- err
+		}(coverProfiles, f)
+	}
 
-		for _, pkg := range parser.packages {
-			result.AddPackage(pkg)
-		}
+	wg.Wait()
+
+	var finalErr error
+	for i := 0; i < len(parser.coverProfiles); i++ {
+		finalErr = multierr.Append(finalErr, <-errorsChannel)
+	}
+
+	if finalErr != nil {
+		return nil, finalErr
+	}
+
+	for _, pkg := range parser.packages {
+		result.AddPackage(pkg)
 	}
 
 	return result, nil
@@ -181,14 +280,14 @@ func findFile(packages packagesCache, file string) (filename, pkgpath string, er
 	if dir != "" {
 		dir = strings.TrimSuffix(dir, "/")
 	}
-	pkg, ok := packages[dir]
-	if !ok {
-		pkg, err = build.Import(dir, ".", build.FindOnly)
-		if err != nil {
-			return "", "", fmt.Errorf("can't find %q: %w", file, err)
-		}
-		packages[dir] = pkg
-	}
+	pkg := packages[dir]
+	// if !ok {
+	// 	pkg, err = build.Import(dir, ".", build.FindOnly)
+	// 	if err != nil {
+	// 		return "", "", fmt.Errorf("can't find %q: %w", file, err)
+	// 	}
+	// 	packages[dir] = pkg
+	// }
 
 	return filepath.Join(pkg.Dir, file), pkg.ImportPath, nil
 }
@@ -408,11 +507,11 @@ func isCodeLine(line string) bool {
 // It sort statements by startline first, then try to find first statement
 // that line number is greater than or equals the startline of the statement.
 // There are two edge cases:
-// 1. When line number is less than all the statements, `Search` function will return 0,
-//    but there is no suitable statement, should return immediately.
-// 2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
-//    then statement of that position minus one is the statement we want,
-//    but still need to check whether the changed line is among the statement scope.
+//  1. When line number is less than all the statements, `Search` function will return 0,
+//     but there is no suitable statement, should return immediately.
+//  2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
+//     then statement of that position minus one is the statement we want,
+//     but still need to check whether the changed line is among the statement scope.
 func (parser *Parser) setStatementsStateByLineNumber(changedlineNumber int, statements []*statement) {
 	idx := sort.Search(len(statements), func(i int) bool {
 		return statements[i].startLine > changedlineNumber

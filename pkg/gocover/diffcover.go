@@ -6,6 +6,8 @@ import (
 	"go/build"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/Azure/gocover/pkg/annotation"
 	"github.com/Azure/gocover/pkg/dbclient"
@@ -13,6 +15,7 @@ import (
 	"github.com/Azure/gocover/pkg/parser"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/multierr"
 )
 
 func NewDiffCover(o *DiffOption) (GoCover, error) {
@@ -157,116 +160,167 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 		return nil, err
 	}
 
-	packages, err := parser.NewParser(diff.coverFilenames, diff.logger).Parse(changes)
+	coverParser, err := parser.NewParser(diff.coverFilenames, diff.logger)
 	if err != nil {
 		return nil, err
+	}
+	packages, err := coverParser.Parse(changes)
+	if err != nil {
+		return nil, err
+	}
+
+	lock := new(sync.Mutex)
+	wg := new(sync.WaitGroup)
+	errorChannel := make(chan error, len(packages))
+
+	coverProfileChannel := make(chan []*report.CoverageProfile, len(packages))
+
+	now := time.Now()
+
+	for _, pkg := range packages {
+		wg.Add(1)
+
+		go func(pkg *parser.Package) {
+			defer wg.Done()
+
+			m := make(map[string]*report.CoverageProfile)
+			fileCache := make(fileContentsCache)
+			added := make(map[string]*report.CoverageProfile)
+			keep := make(map[string]string)
+
+			diff.logger.Debugf("package: %s", pkg.Name)
+			diff.ignoreProfiles = append(diff.ignoreProfiles, pkg.IgnoreProfiles...)
+
+			p, err := build.Import(pkg.Name, ".", build.FindOnly)
+			if err != nil {
+				errorChannel <- fmt.Errorf("build import %w", err)
+				return
+			}
+
+			var coverProfiles []*report.CoverageProfile
+
+			for _, fun := range pkg.Functions {
+
+				// extract into single function
+				coverProfile, ok := m[fun.File]
+				if !ok {
+					coverProfile = &report.CoverageProfile{
+						FileName: formatFilePath(p.Root, fun.File, diff.modulePath),
+					}
+					m[fun.File] = coverProfile
+				}
+
+				fileContents, err := findFileContents(fileCache, fun.File)
+				if err != nil {
+					errorChannel <- fmt.Errorf("find file contents: %w", err)
+					return
+				}
+
+				section := &report.ViolationSection{
+					StartLine: fun.StartLine,
+					EndLine:   fun.EndLine,
+				}
+
+				for i := fun.StartLine; i <= fun.EndLine; i++ {
+					section.Contents = append(section.Contents, fileContents[i-1])
+				}
+
+				var total, ignored, covered int
+				violated := false
+				changed := false
+				for _, st := range fun.Statements {
+					if st.State == parser.Original {
+						continue
+					}
+
+					changed = true
+					total += 1
+
+					if st.Mode == parser.Ignore {
+						diff.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
+						ignored++
+					}
+					if st.Reached > 0 {
+						covered++
+					} else {
+						section.ViolationLines = append(section.ViolationLines, st.StartLine)
+						violated = true
+					}
+
+				}
+
+				if changed {
+
+					if ok := inExclueds(
+						diff.excludeFiles,
+						diff.excludePatterns,
+						formatFilePath(p.Root, fun.File, diff.modulePath),
+						diff.logger,
+					); ok {
+						continue
+					}
+
+					coverProfile.TotalLines += total
+					coverProfile.CoveredLines += covered
+					coverProfile.TotalEffectiveLines += (total - ignored)
+					coverProfile.TotalIgnoredLines += ignored
+					if violated {
+						coverProfile.ViolationSections = append(coverProfile.ViolationSections, section)
+					}
+					if _, ok := added[fun.File]; !ok {
+						coverProfiles = append(coverProfiles, coverProfile)
+						added[fun.File] = coverProfile
+						keep[fun.File] = p.Root
+					}
+				}
+			}
+
+			lock.Lock()
+			for k, v := range added {
+				node := diff.coverageTree.FindOrCreate(strings.TrimPrefix(k, keep[k]))
+				node.TotalLines = int64(v.TotalLines)
+				node.TotalCoveredLines = int64(v.CoveredLines)
+				node.TotalEffectiveLines = int64(v.TotalEffectiveLines)
+				node.TotalIgnoredLines = int64(v.TotalIgnoredLines)
+			}
+			lock.Unlock()
+
+			errorChannel <- nil
+			coverProfileChannel <- coverProfiles
+
+		}(pkg)
+
+	}
+
+	wg.Wait()
+
+	now1 := time.Now()
+	fmt.Printf("TIME 3: %v\n", now1.Sub(now).Seconds())
+
+	var finalErr error
+	for i := 0; i < len(packages); i++ {
+		finalErr = multierr.Append(finalErr, <-errorChannel)
+	}
+
+	if finalErr != nil {
+		return nil, finalErr
 	}
 
 	statistics := &report.Statistics{
 		StatisticsType: report.DiffStatisticsType,
 		ComparedBranch: diff.comparedBranch,
 	}
-	m := make(map[string]*report.CoverageProfile)
-	fileCache := make(fileContentsCache)
-	added := make(map[string]*report.CoverageProfile)
-	keep := make(map[string]string)
-	for _, pkg := range packages {
-		diff.logger.Debugf("package: %s", pkg.Name)
-		diff.ignoreProfiles = append(diff.ignoreProfiles, pkg.IgnoreProfiles...)
 
-		p, err := build.Import(pkg.Name, ".", build.FindOnly)
-		if err != nil {
-			return nil, fmt.Errorf("build import %w", err)
-		}
-
-		for _, fun := range pkg.Functions {
-
-			// extract into single function
-			coverProfile, ok := m[fun.File]
-			if !ok {
-				coverProfile = &report.CoverageProfile{
-					FileName: formatFilePath(p.Root, fun.File, diff.modulePath),
-				}
-				m[fun.File] = coverProfile
-			}
-
-			fileContents, err := findFileContents(fileCache, fun.File)
-			if err != nil {
-				return nil, fmt.Errorf("find file contents: %w", err)
-			}
-
-			section := &report.ViolationSection{
-				StartLine: fun.StartLine,
-				EndLine:   fun.EndLine,
-			}
-
-			for i := fun.StartLine; i <= fun.EndLine; i++ {
-				section.Contents = append(section.Contents, fileContents[i-1])
-			}
-
-			var total, ignored, covered int
-			violated := false
-			changed := false
-			for _, st := range fun.Statements {
-				if st.State == parser.Original {
-					continue
-				}
-
-				changed = true
-				total += 1
-
-				if st.Mode == parser.Ignore {
-					diff.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
-					ignored++
-				}
-				if st.Reached > 0 {
-					covered++
-				} else {
-					section.ViolationLines = append(section.ViolationLines, st.StartLine)
-					violated = true
-				}
-
-			}
-
-			if changed {
-
-				if ok := inExclueds(
-					diff.excludeFiles,
-					diff.excludePatterns,
-					formatFilePath(p.Root, fun.File, diff.modulePath),
-					diff.logger,
-				); ok {
-					continue
-				}
-
-				coverProfile.TotalLines += total
-				coverProfile.CoveredLines += covered
-				coverProfile.TotalEffectiveLines += (total - ignored)
-				coverProfile.TotalIgnoredLines += ignored
-				if violated {
-					coverProfile.ViolationSections = append(coverProfile.ViolationSections, section)
-				}
-				if _, ok := added[fun.File]; !ok {
-					statistics.CoverageProfile = append(statistics.CoverageProfile, coverProfile)
-					added[fun.File] = coverProfile
-					keep[fun.File] = p.Root
-				}
-			}
-		}
-
-	}
-
-	for k, v := range added {
-		node := diff.coverageTree.FindOrCreate(strings.TrimPrefix(k, keep[k]))
-		node.TotalLines = int64(v.TotalLines)
-		node.TotalCoveredLines = int64(v.CoveredLines)
-		node.TotalEffectiveLines = int64(v.TotalEffectiveLines)
-		node.TotalIgnoredLines = int64(v.TotalIgnoredLines)
+	for i := 0; i < len(packages); i++ {
+		statistics.CoverageProfile = append(statistics.CoverageProfile, <-coverProfileChannel...)
 	}
 
 	diff.coverageTree.CollectCoverageData()
 
 	reBuildStatistics(statistics, diff.excludeFiles)
+
+	now2 := time.Now()
+	fmt.Printf("TIME 4: %v\n", now2.Sub(now1).Seconds())
 
 	return statistics, nil
 }
