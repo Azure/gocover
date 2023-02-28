@@ -7,6 +7,36 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+func TestParser(t *testing.T) {
+	t.Run("buildPackageCache", func(t *testing.T) {
+		parser := &Parser{
+			coverProfileFiles: []string{"testdata/cover.out"},
+			packages:          make(map[string]*Package),
+			packagesCache:     make(packagesCache),
+			logger:            logrus.New(),
+		}
+
+		parser.buildPackageCache()
+		for _, pkg := range []string{
+			"github.com/Azure/gocover/pkg/parser",
+			"github.com/Azure/gocover/pkg/report",
+			"github.com/Azure/gocover/pkg/gocover",
+			"github.com/Azure/gocover/pkg/gittool",
+			"github.com/Azure/gocover/pkg/dbclient",
+			"github.com/Azure/gocover/pkg/cmd",
+			"github.com/Azure/gocover/pkg/annotation",
+			"github.com/Azure/gocover",
+		} {
+			if _, ok := parser.packagesCache[pkg]; !ok {
+				t.Errorf("package %s is not in packagesCache", pkg)
+			}
+			if _, ok := parser.packages[pkg]; !ok {
+				t.Errorf("package %s is not in packages", pkg)
+			}
+		}
+	})
+}
+
 func TestSetStatementsState(t *testing.T) {
 	t.Run("change is nil", func(t *testing.T) {
 		parser := &Parser{}

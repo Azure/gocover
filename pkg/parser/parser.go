@@ -41,6 +41,11 @@ type Parser struct {
 
 // Parse parses cover profiles into statements, and modify their state based on git changes.
 func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
+	if err := parser.buildPackageCache(); err != nil {
+		parser.logger.WithError(err).Error("build package cache")
+		return nil, err
+	}
+
 	var result Packages
 
 	for _, coverProfile := range parser.coverProfileFiles {
@@ -63,6 +68,34 @@ func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
 	}
 
 	return result, nil
+}
+
+func (parser *Parser) buildPackageCache() error {
+
+	for _, coverFile := range parser.coverProfileFiles {
+		profiles, err := cover.ParseProfiles(coverFile)
+		if err != nil {
+			return err
+		}
+
+		for _, profile := range profiles {
+			dir, _ := filepath.Split(profile.FileName)
+			if dir != "" {
+				dir = strings.TrimSuffix(dir, "/")
+			}
+			_, ok := parser.packagesCache[dir]
+			if !ok {
+				pkg, err := build.Import(dir, ".", build.FindOnly)
+				if err != nil {
+					return err
+				}
+				parser.packagesCache[dir] = pkg
+				parser.packages[pkg.ImportPath] = &Package{Name: pkg.ImportPath}
+			}
+		}
+	}
+
+	return nil
 }
 
 // wrapper for Statement
@@ -183,11 +216,7 @@ func findFile(packages packagesCache, file string) (filename, pkgpath string, er
 	}
 	pkg, ok := packages[dir]
 	if !ok {
-		pkg, err = build.Import(dir, ".", build.FindOnly)
-		if err != nil {
-			return "", "", fmt.Errorf("can't find %q: %w", file, err)
-		}
-		packages[dir] = pkg
+		return "", "", fmt.Errorf("no package found for %s", file)
 	}
 
 	return filepath.Join(pkg.Dir, file), pkg.ImportPath, nil
@@ -408,11 +437,11 @@ func isCodeLine(line string) bool {
 // It sort statements by startline first, then try to find first statement
 // that line number is greater than or equals the startline of the statement.
 // There are two edge cases:
-// 1. When line number is less than all the statements, `Search` function will return 0,
-//    but there is no suitable statement, should return immediately.
-// 2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
-//    then statement of that position minus one is the statement we want,
-//    but still need to check whether the changed line is among the statement scope.
+//  1. When line number is less than all the statements, `Search` function will return 0,
+//     but there is no suitable statement, should return immediately.
+//  2. Otherwise, `Search` function will return first statement that its startline is greater than changed line number,
+//     then statement of that position minus one is the statement we want,
+//     but still need to check whether the changed line is among the statement scope.
 func (parser *Parser) setStatementsStateByLineNumber(changedlineNumber int, statements []*statement) {
 	idx := sort.Search(len(statements), func(i int) bool {
 		return statements[i].startLine > changedlineNumber
