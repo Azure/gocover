@@ -24,6 +24,7 @@ func NewParser(
 ) *Parser {
 	return &Parser{
 		coverProfileFiles: coverProfileFiles,
+		coverProfiles:     make([]*cover.Profile, 0),
 		packages:          make(map[string]*Package),
 		packagesCache:     make(packagesCache),
 		logger:            logger.WithField("source", "Parser"),
@@ -35,12 +36,17 @@ type Parser struct {
 	packages          map[string]*Package
 	packagesCache     packagesCache
 	coverProfileFiles []string
+	coverProfiles     []*cover.Profile
 
 	logger logrus.FieldLogger
 }
 
 // Parse parses cover profiles into statements, and modify their state based on git changes.
 func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
+	if err := parser.filterCoverProfiles(changes); err != nil {
+		parser.logger.WithError(err).Error("filter cover profiles")
+		return nil, err
+	}
 	if err := parser.buildPackageCache(); err != nil {
 		parser.logger.WithError(err).Error("build package cache")
 		return nil, err
@@ -48,50 +54,62 @@ func (parser *Parser) Parse(changes []*gittool.Change) (Packages, error) {
 
 	var result Packages
 
-	for _, coverProfile := range parser.coverProfileFiles {
-
-		profiles, err := cover.ParseProfiles(coverProfile)
-		if err != nil {
-			parser.logger.WithError(err).Error("parse cover profile")
+	for _, p := range parser.coverProfiles {
+		if err := parser.convertProfile(p, findChange(p, changes)); err != nil {
+			parser.logger.WithError(err).Error("covert cover profile")
 			return nil, err
 		}
-		for _, p := range profiles {
-			if err := parser.convertProfile(p, findChange(p, changes)); err != nil {
-				parser.logger.WithError(err).Error("covert cover profile")
-				return nil, err
-			}
-		}
+	}
 
-		for _, pkg := range parser.packages {
-			result.AddPackage(pkg)
-		}
+	for _, pkg := range parser.packages {
+		result.AddPackage(pkg)
 	}
 
 	return result, nil
 }
 
-func (parser *Parser) buildPackageCache() error {
+// filterCoverProfiles filters cover profiles based on git changes.
+// If changes is nil, all cover profiles will be kept.
+// If changes is not nil, only cover profiles that are changed will be kept.
+func (parser *Parser) filterCoverProfiles(changes []*gittool.Change) error {
 
-	for _, coverFile := range parser.coverProfileFiles {
-		profiles, err := cover.ParseProfiles(coverFile)
+	for _, coverProfile := range parser.coverProfileFiles {
+		profiles, err := cover.ParseProfiles(coverProfile)
 		if err != nil {
 			return err
 		}
 
-		for _, profile := range profiles {
-			dir, _ := filepath.Split(profile.FileName)
-			if dir != "" {
-				dir = strings.TrimSuffix(dir, "/")
+		if changes == nil {
+			parser.coverProfiles = append(parser.coverProfiles, profiles...)
+			continue
+		}
+
+		for _, p := range profiles {
+			if findChange(p, changes) != nil {
+				parser.coverProfiles = append(parser.coverProfiles, p)
 			}
-			_, ok := parser.packagesCache[dir]
-			if !ok {
-				pkg, err := build.Import(dir, ".", build.FindOnly)
-				if err != nil {
-					return err
-				}
-				parser.packagesCache[dir] = pkg
-				parser.packages[pkg.ImportPath] = &Package{Name: pkg.ImportPath}
+		}
+	}
+
+	return nil
+}
+
+// buildPackageCache builds a cache of packages for all cover profiles.
+func (parser *Parser) buildPackageCache() error {
+
+	for _, profile := range parser.coverProfiles {
+		dir, _ := filepath.Split(profile.FileName)
+		if dir != "" {
+			dir = strings.TrimSuffix(dir, "/")
+		}
+		_, ok := parser.packagesCache[dir]
+		if !ok {
+			pkg, err := build.Import(dir, ".", build.FindOnly)
+			if err != nil {
+				return err
 			}
+			parser.packagesCache[dir] = pkg
+			parser.packages[pkg.ImportPath] = &Package{Name: pkg.ImportPath}
 		}
 	}
 

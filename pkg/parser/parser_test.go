@@ -5,11 +5,30 @@ import (
 
 	"github.com/Azure/gocover/pkg/gittool"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/tools/cover"
+)
+
+var (
+	allPackages = []string{
+		"github.com/Azure/gocover/pkg/parser",
+		"github.com/Azure/gocover/pkg/report",
+		"github.com/Azure/gocover/pkg/gocover",
+		"github.com/Azure/gocover/pkg/gittool",
+		"github.com/Azure/gocover/pkg/dbclient",
+		"github.com/Azure/gocover/pkg/cmd",
+		"github.com/Azure/gocover/pkg/annotation",
+		"github.com/Azure/gocover",
+	}
 )
 
 func TestParser(t *testing.T) {
 	t.Run("buildPackageCache", func(t *testing.T) {
+		profiles, err := cover.ParseProfiles("testdata/cover.out")
+		assert.NoError(t, err)
+
 		parser := &Parser{
+			coverProfiles:     profiles,
 			coverProfileFiles: []string{"testdata/cover.out"},
 			packages:          make(map[string]*Package),
 			packagesCache:     make(packagesCache),
@@ -17,16 +36,7 @@ func TestParser(t *testing.T) {
 		}
 
 		parser.buildPackageCache()
-		for _, pkg := range []string{
-			"github.com/Azure/gocover/pkg/parser",
-			"github.com/Azure/gocover/pkg/report",
-			"github.com/Azure/gocover/pkg/gocover",
-			"github.com/Azure/gocover/pkg/gittool",
-			"github.com/Azure/gocover/pkg/dbclient",
-			"github.com/Azure/gocover/pkg/cmd",
-			"github.com/Azure/gocover/pkg/annotation",
-			"github.com/Azure/gocover",
-		} {
+		for _, pkg := range allPackages {
 			if _, ok := parser.packagesCache[pkg]; !ok {
 				t.Errorf("package %s is not in packagesCache", pkg)
 			}
@@ -35,6 +45,66 @@ func TestParser(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("filterCoverProfiles with no changes", func(t *testing.T) {
+
+		t.Run("no changes", func(t *testing.T) {
+			parser := &Parser{
+				coverProfileFiles: []string{"testdata/cover.out"},
+				packages:          make(map[string]*Package),
+				packagesCache:     make(packagesCache),
+				logger:            logrus.New(),
+			}
+
+			profiles, err := cover.ParseProfiles("testdata/cover.out")
+			assert.NoError(t, err)
+
+			err = parser.filterCoverProfiles(nil)
+			assert.NoError(t, err)
+
+			assert.Len(t, parser.coverProfiles, len(profiles))
+
+			var allFiles []string
+			for _, profile := range profiles {
+				allFiles = append(allFiles, profile.FileName)
+			}
+
+			for _, profile := range parser.coverProfiles {
+				assert.Contains(t, allFiles, profile.FileName)
+			}
+		})
+
+		t.Run("with changes", func(t *testing.T) {
+			parser := &Parser{
+				coverProfileFiles: []string{"testdata/cover.out"},
+				packages:          make(map[string]*Package),
+				packagesCache:     make(packagesCache),
+				logger:            logrus.New(),
+			}
+
+			changes := []*gittool.Change{
+				{
+					FileName: "pkg/parser/parser.go",
+				},
+				{
+					FileName: "pkg/gocover/executor.go",
+				},
+			}
+
+			err := parser.filterCoverProfiles(changes)
+			assert.NoError(t, err)
+
+			expected := []string{
+				"github.com/Azure/gocover/pkg/parser/parser.go",
+				"github.com/Azure/gocover/pkg/gocover/executor.go",
+			}
+			assert.Len(t, parser.coverProfiles, len(expected))
+			for _, profile := range parser.coverProfiles {
+				assert.Contains(t, expected, profile.FileName)
+			}
+		})
+	})
+
 }
 
 func TestSetStatementsState(t *testing.T) {
