@@ -345,18 +345,20 @@ func TestNormalizeLines(t *testing.T) {
 func TestPercentCovered(t *testing.T) {
 	t.Run("percentCovered", func(t *testing.T) {
 		testsuites := []struct {
-			expected float64
-			total    int
-			covered  int
+			expected          float64
+			total             int
+			covered           int
+			coveredButIgnored int
 		}{
-			{expected: 100.0, total: 10, covered: 10},
-			{expected: 50.0, total: 10, covered: 5},
-			{expected: 0.0, total: 10, covered: 0},
-			{expected: 100.0, total: 0, covered: 0},
+			{expected: 100.0, total: 10, covered: 10, coveredButIgnored: 0},
+			{expected: 50.0, total: 10, covered: 5, coveredButIgnored: 0},
+			{expected: 0.0, total: 10, covered: 0, coveredButIgnored: 0},
+			{expected: 100.0, total: 0, covered: 0, coveredButIgnored: 0},
+			{expected: 10.0, total: 100, covered: 20, coveredButIgnored: 10},
 		}
 
 		for _, testcase := range testsuites {
-			actual := percentCovered(testcase.total, testcase.covered)
+			actual := percentCovered(testcase.total, testcase.covered, testcase.coveredButIgnored)
 			if testcase.expected != actual {
 				t.Errorf("expected %f, but get %f", testcase.expected, actual)
 			}

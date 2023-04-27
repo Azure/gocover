@@ -1,6 +1,6 @@
 module github.com/Azure/gocover
 
-go 1.18
+go 1.20
 
 require (
 	github.com/Azure/azure-kusto-go v0.8.0

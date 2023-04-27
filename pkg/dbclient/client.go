@@ -25,15 +25,17 @@ type DbClient interface {
 }
 
 type CoverageData struct {
-	PreciseTimestamp time.Time `json:"preciseTimestamp"` // time send to db
-	TotalLines       int64     `json:"totalLines"`       // total lines of the entire repo/module.
-	EffectiveLines   int64     `json:"effectiveLines"`   // the lines for coverage base, total lines - ignored lines
-	IgnoredLines     int64     `json:"ignoredLines"`     // the lines ignored.
-	CoveredLines     int64     `json:"coveredLines"`     // the lines covered by test
-	Coverage         float64   `json:"coverage"`         // unit test coverage, CoveredLines / EffectiveLines
-	CoverageMode     string    `json:"coverageMode"`     // coverage mode, diff or full subcommand
-	ModulePath       string    `json:"modulePath"`       // module name, which is declared in go.mod
-	FilePath         string    `json:"filePath"`         // file path for a concrete file or directory
+	PreciseTimestamp       time.Time `json:"preciseTimestamp"`       // time send to db
+	TotalLines             int64     `json:"totalLines"`             // total lines of the entire repo/module.
+	EffectiveLines         int64     `json:"effectiveLines"`         // the lines for coverage base, total lines - ignored lines
+	IgnoredLines           int64     `json:"ignoredLines"`           // the lines ignored.
+	CoveredLines           int64     `json:"coveredLines"`           // the lines covered by test
+	Coverage               float64   `json:"coverage"`               // unit test coverage, CoveredLines / TotalLines
+	CoverageWithIgnored    float64   `json:"coverageWithIgnorance"`  // unit test coverage exclude ignored lines, (CoveredLines - CoveredButIgnoredLines) / EffectiveLines
+	CoveredButIgnoredLines int64     `json:"coveredButIgnoredLines"` // the lines covered but ignored
+	CoverageMode           string    `json:"coverageMode"`           // coverage mode, diff or full subcommand
+	ModulePath             string    `json:"modulePath"`             // module name, which is declared in go.mod
+	FilePath               string    `json:"filePath"`               // file path for a concrete file or directory
 
 	Extra map[string]interface{} // extra data that passing accordingly
 }

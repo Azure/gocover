@@ -204,7 +204,7 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 				section.Contents = append(section.Contents, fileContents[i-1])
 			}
 
-			var total, ignored, covered int
+			var total, ignored, covered, coveredButIgnored int
 			violated := false
 			changed := false
 			for _, st := range fun.Statements {
@@ -214,6 +214,10 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 
 				changed = true
 				total += 1
+
+				if st.Mode == parser.Ignore && st.Reached > 0 {
+					coveredButIgnored++
+				}
 
 				if st.Mode == parser.Ignore {
 					diff.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
@@ -243,6 +247,7 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 				coverProfile.CoveredLines += covered
 				coverProfile.TotalEffectiveLines += (total - ignored)
 				coverProfile.TotalIgnoredLines += ignored
+				coverProfile.CoveredButIgnoredLines += coveredButIgnored
 				if violated {
 					coverProfile.ViolationSections = append(coverProfile.ViolationSections, section)
 				}
@@ -262,6 +267,7 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 		node.TotalCoveredLines = int64(v.CoveredLines)
 		node.TotalEffectiveLines = int64(v.TotalEffectiveLines)
 		node.TotalIgnoredLines = int64(v.TotalIgnoredLines)
+		node.TotalCoveredButIgnoreLines = int64(v.CoveredButIgnoredLines)
 	}
 
 	diff.coverageTree.CollectCoverageData()

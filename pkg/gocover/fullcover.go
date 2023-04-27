@@ -172,12 +172,16 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 
 			node := full.coverageTree.FindOrCreate(strings.TrimPrefix(fun.File, p.Root))
 
-			var total, ignored, covered int
+			var total, ignored, covered, coveredButIgnored int
 			violated := false
 			for _, st := range fun.Statements {
 				total += 1
 				node.TotalLines += 1
 
+				if st.Mode == parser.Ignore && st.Reached > 0 {
+					coveredButIgnored++
+					node.TotalCoveredButIgnoreLines += 1
+				}
 				if st.Mode == parser.Ignore {
 					full.logger.Debugf("%s ignore line %d", fun.File, st.StartLine)
 					ignored++
@@ -197,6 +201,7 @@ func (full *fullCover) generateStatistics() (*report.Statistics, error) {
 
 			coverProfile.TotalLines += total
 			coverProfile.CoveredLines += covered
+			coverProfile.CoveredButIgnoredLines += coveredButIgnored
 			coverProfile.TotalEffectiveLines += (total - ignored)
 			coverProfile.TotalIgnoredLines += ignored
 			coverProfile.TotalViolationLines = append(coverProfile.TotalViolationLines, section.ViolationLines...)

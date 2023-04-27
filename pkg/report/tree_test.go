@@ -20,25 +20,27 @@ func beforeRun() {
 				Name: "child1",
 				Nodes: map[string]*TreeNode{
 					"leaf1": {
-						Name:                "leaf1",
-						TotalLines:          120,
-						TotalEffectiveLines: 100,
-						TotalIgnoredLines:   20,
-						TotalCoveredLines:   80,
-						TotalViolationLines: 20,
-						isLeaf:              true,
+						Name:                       "leaf1",
+						TotalLines:                 120,
+						TotalEffectiveLines:        100,
+						TotalIgnoredLines:          20,
+						TotalCoveredLines:          80,
+						TotalViolationLines:        20,
+						TotalCoveredButIgnoreLines: 1,
+						isLeaf:                     true,
 					},
 					"child3": {
 						Name: "child3",
 						Nodes: map[string]*TreeNode{
 							"leaf3": {
-								Name:                "leaf3",
-								TotalLines:          110,
-								TotalEffectiveLines: 80,
-								TotalIgnoredLines:   30,
-								TotalCoveredLines:   50,
-								TotalViolationLines: 30,
-								isLeaf:              true,
+								Name:                       "leaf3",
+								TotalLines:                 110,
+								TotalEffectiveLines:        80,
+								TotalIgnoredLines:          30,
+								TotalCoveredLines:          50,
+								TotalViolationLines:        30,
+								TotalCoveredButIgnoreLines: 2,
+								isLeaf:                     true,
 							},
 						},
 					},
@@ -48,22 +50,24 @@ func beforeRun() {
 				Name: "child2",
 				Nodes: map[string]*TreeNode{
 					"leaf20": {
-						Name:                "leaf20",
-						TotalLines:          60,
-						TotalEffectiveLines: 50,
-						TotalIgnoredLines:   10,
-						TotalCoveredLines:   40,
-						TotalViolationLines: 10,
-						isLeaf:              true,
+						Name:                       "leaf20",
+						TotalLines:                 60,
+						TotalEffectiveLines:        50,
+						TotalIgnoredLines:          10,
+						TotalCoveredLines:          40,
+						TotalViolationLines:        10,
+						TotalCoveredButIgnoreLines: 3,
+						isLeaf:                     true,
 					},
 					"leaf21": {
-						Name:                "leaf21",
-						TotalLines:          90,
-						TotalEffectiveLines: 60,
-						TotalIgnoredLines:   30,
-						TotalCoveredLines:   30,
-						TotalViolationLines: 30,
-						isLeaf:              true,
+						Name:                       "leaf21",
+						TotalLines:                 90,
+						TotalEffectiveLines:        60,
+						TotalIgnoredLines:          30,
+						TotalCoveredLines:          30,
+						TotalViolationLines:        30,
+						TotalCoveredButIgnoreLines: 4,
+						isLeaf:                     true,
 					},
 				},
 			},
@@ -75,7 +79,7 @@ func TestCoverageTree(t *testing.T) {
 
 	t.Run("collect when root is nil", func(t *testing.T) {
 		var root *TreeNode
-		total, effectived, ignored, covered, violation := collect(root)
+		total, effectived, ignored, covered, violation, coveredButIgnored := collect(root)
 		if total != 0 {
 			t.Errorf("total expected 0, but get %d", total)
 		}
@@ -91,12 +95,15 @@ func TestCoverageTree(t *testing.T) {
 		if violation != 0 {
 			t.Errorf("violation expected 0, but get %d", violation)
 		}
+		if coveredButIgnored != 0 {
+			t.Errorf("coveredButIgnored expected 0, but get %d", coveredButIgnored)
+		}
 	})
 
 	t.Run("collect when root contains all the statistical data", func(t *testing.T) {
 		beforeRun()
 
-		total, effectived, ignored, covered, violation := collect(root)
+		total, effectived, ignored, covered, violation, coveredButIgnored := collect(root)
 		if total != 380 {
 			t.Errorf("total expected 380, but get %d", total)
 		}
@@ -111,6 +118,9 @@ func TestCoverageTree(t *testing.T) {
 		}
 		if violation != 90 {
 			t.Errorf("violation expected 90, but get %d", violation)
+		}
+		if coveredButIgnored != 10 {
+			t.Errorf("coveredButIgnored expected 0, but get %d", coveredButIgnored)
 		}
 	})
 
@@ -158,6 +168,9 @@ func TestCoverageTree(t *testing.T) {
 		}
 		if coverageTree.Root.TotalViolationLines != 90 {
 			t.Errorf("violation expected 90, but get %d", coverageTree.Root.TotalViolationLines)
+		}
+		if coverageTree.Root.TotalCoveredButIgnoreLines != 10 {
+			t.Errorf("coveredButIgnored expected 90, but get %d", coverageTree.Root.TotalCoveredButIgnoreLines)
 		}
 	})
 
