@@ -61,13 +61,14 @@ func calculateCoverage(covered int64, effectived int64) float64 {
 func reBuildStatistics(s *report.Statistics, cache excludeFileCache) {
 	for _, p := range s.CoverageProfile {
 		s.TotalLines += p.TotalLines
-		s.TotalCoveredLines += p.CoveredLines
 		s.TotalEffectiveLines += p.TotalEffectiveLines
 		s.TotalIgnoredLines += p.TotalIgnoredLines
+		s.TotalCoveredLines += p.CoveredLines
+		s.TotalCoveredButIgnoredLines += p.CoveredButIgnoredLines
 	}
 
 	s.TotalCoveragePercent = calculateCoverage(
-		int64(s.TotalCoveredLines),
+		int64(s.TotalCoveredLines-s.TotalCoveredButIgnoredLines),
 		int64(s.TotalEffectiveLines),
 	)
 	s.TotalCoverageWithoutIgnore = calculateCoverage(
@@ -83,9 +84,11 @@ func reBuildStatistics(s *report.Statistics, cache excludeFileCache) {
 // formatFilePath format filename that strip root path and adds module path
 // fileNamePath is the absolute path of the file, modulePath is the module path of go module
 // for example:
-//    rootRepoPath: /home/User/go/src/Azure/gocover
-//    fileNamePath: /home/User/go/src/Azure/gocover/pkg/foo/foo.go
-//    modulePath: github.com/Azure/gocover
+//
+//	rootRepoPath: /home/User/go/src/Azure/gocover
+//	fileNamePath: /home/User/go/src/Azure/gocover/pkg/foo/foo.go
+//	modulePath: github.com/Azure/gocover
+//
 // it returns github.com/Azure/gocover/foo/foo.go
 func formatFilePath(rootRepoPath, fileNamePath, modulePath string) string {
 	return filepath.Join(modulePath,
@@ -100,15 +103,17 @@ func storeCoverageData(ctx context.Context, dbClient dbclient.DbClient, all []*r
 	var data []*dbclient.CoverageData
 	for _, info := range all {
 		d := &dbclient.CoverageData{
-			PreciseTimestamp: now,
-			TotalLines:       info.TotalLines,
-			EffectiveLines:   info.TotalEffectiveLines,
-			IgnoredLines:     info.TotalIgnoredLines,
-			CoveredLines:     info.TotalCoveredLines,
-			ModulePath:       modulePath,
-			FilePath:         info.Path,
-			Coverage:         calculateCoverage(info.TotalCoveredLines, info.TotalEffectiveLines),
-			CoverageMode:     string(coverageMode),
+			PreciseTimestamp:       now,
+			TotalLines:             info.TotalLines,
+			EffectiveLines:         info.TotalEffectiveLines,
+			IgnoredLines:           info.TotalIgnoredLines,
+			CoveredLines:           info.TotalCoveredLines,
+			CoveredButIgnoredLines: info.TotalCoveredButIgnoreLines,
+			ModulePath:             modulePath,
+			FilePath:               info.Path,
+			Coverage:               calculateCoverage(info.TotalCoveredLines, info.TotalLines),
+			CoverageWithIgnored:    calculateCoverage(info.TotalCoveredLines-info.TotalCoveredButIgnoreLines, info.TotalEffectiveLines),
+			CoverageMode:           string(coverageMode),
 		}
 		data = append(data, d)
 	}
@@ -160,15 +165,18 @@ func storeIgnoreProfileData(ctx context.Context, dbClient dbclient.DbClient, ign
 // dump outputs all coverage results
 func dump(all []*report.AllInformation, logger logrus.FieldLogger) {
 	logger.Debug("Summary of coverage:")
+	logger.Debug("Path EffectiveLines CoveredLines IgnoredLines TotalLines CoveredButIgnoredLines Coverage CoverageWithIgnorance")
 
 	for _, info := range all {
-		logger.Debugf("%s %d %d %d %d %.1f%%",
+		logger.Debugf("%s %d %d %d %d %d %.1f%% %.1f%%",
 			info.Path,
 			info.TotalEffectiveLines,
 			info.TotalCoveredLines,
 			info.TotalIgnoredLines,
 			info.TotalLines,
-			calculateCoverage(info.TotalCoveredLines, info.TotalEffectiveLines),
+			info.TotalCoveredButIgnoreLines,
+			calculateCoverage(info.TotalCoveredLines, info.TotalLines),
+			calculateCoverage(info.TotalCoveredLines-info.TotalCoveredButIgnoreLines, info.TotalEffectiveLines),
 		)
 	}
 }

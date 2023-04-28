@@ -76,7 +76,7 @@ var htmlCoverageReport = "" +
 
         <p>
             <b>Coverage </b> = Covered / Total <br />
-            <b>Coverage (with ignorance) </b> = Covered / Effective <br />
+            <b>Coverage (with ignorance) </b> = (Covered - CoveredButIngored) / Effective <br />
             <b>Total</b> = Effective + Ignored
         </p>
 
@@ -94,6 +94,7 @@ var htmlCoverageReport = "" +
                     {{ end }}
                     <th>Covered Lines</th>
                     <th>Ignored Lines</th>
+                    <th>Covered But Ignored Lines</th>
                     <th>Effective Lines</th>
                     <th>Total Lines</th>
                 </tr>
@@ -102,10 +103,11 @@ var htmlCoverageReport = "" +
                 {{ range .CoverageProfile }}
                 <tr>
                     <td><a href="#{{.FileName}}">{{ .FileName }}</a></td>
-                    <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines }}</td>
-                    <td>{{ PercentCovered .TotalLines .CoveredLines }}</td>
+                    <td>{{ PercentCovered .TotalEffectiveLines .CoveredLines .CoveredButIgnoredLines }}</td>
+                    <td>{{ PercentCovered .TotalLines .CoveredLines 0 }}</td>
                     <td>{{ .CoveredLines }}</td>
                     <td>{{ .TotalIgnoredLines }}</td>
+                    <td>{{ .CoveredButIgnoredLines }}</td>
                     <td>{{ .TotalEffectiveLines }}</td>
                     <td>{{ .TotalLines }}</td>
                 </tr>
@@ -115,7 +117,7 @@ var htmlCoverageReport = "" +
 
         {{ range .CoverageProfile }}
             <div class="src-snippet">
-                {{ if lt (PercentCovered .TotalEffectiveLines .CoveredLines) 100.0 }}
+                {{ if lt (PercentCovered .TotalEffectiveLines .CoveredLines .CoveredButIgnoredLines) 100.0 }}
                 <div class="src-name" id="{{.FileName}}">{{ .FileName }}</div>
                 <div class="snippets">
                     {{range .CodeSnippet}}

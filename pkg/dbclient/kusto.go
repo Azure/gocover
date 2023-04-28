@@ -351,6 +351,13 @@ var basicCoverageMappings = []mapping{
 		},
 	},
 	{
+		Column:   "coverageWithIgnorance",
+		Datatype: "real",
+		Properties: properties{
+			Path: "$.coverageWithIgnorance",
+		},
+	},
+	{
 		Column:   "totalLines",
 		Datatype: "long",
 		Properties: properties{
@@ -376,6 +383,13 @@ var basicCoverageMappings = []mapping{
 		Datatype: "long",
 		Properties: properties{
 			Path: "$.coveredLines",
+		},
+	},
+	{
+		Column:   "coveredButIgnoredLines",
+		Datatype: "long",
+		Properties: properties{
+			Path: "$.coveredButIgnoredLines",
 		},
 	},
 	{

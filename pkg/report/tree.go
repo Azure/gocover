@@ -27,15 +27,16 @@ type Tree *TreeNode
 // Each internal node has one or many sub node, which is stored in a map, and can be retrieved by node name.
 // For the leaf node, it does not have sub node.
 type TreeNode struct {
-	Name                string // name
-	TotalLines          int64  // total lines of the entire repo/module.
-	TotalEffectiveLines int64  // the lines that for coverage, total lines - ignored lines
-	TotalIgnoredLines   int64  // the lines ignored.
-	TotalCoveredLines   int64  // covered lines account for coverage
-	TotalViolationLines int64  // violation lines that not covered for coverage
-	CoverageProfile     *CoverageProfile
-	Nodes               map[string]*TreeNode // sub nodes that store in map
-	isLeaf              bool                 // whether the node is leaf or internal node
+	Name                       string // name
+	TotalLines                 int64  // total lines of the entire repo/module.
+	TotalEffectiveLines        int64  // the lines that for coverage, total lines - ignored lines
+	TotalIgnoredLines          int64  // the lines ignored
+	TotalCoveredLines          int64  // covered lines account for coverage
+	TotalViolationLines        int64  // violation lines that not covered for coverage
+	TotalCoveredButIgnoreLines int64  // the lines that covered but ignored
+	CoverageProfile            *CoverageProfile
+	Nodes                      map[string]*TreeNode // sub nodes that store in map
+	isLeaf                     bool                 // whether the node is leaf or internal node
 }
 
 func NewCoverageTree(modulePath string) CoverageTree {
@@ -61,22 +62,24 @@ type coverageTree struct {
 var _ CoverageTree = (*coverageTree)(nil)
 
 type AllInformation struct {
-	Path                string
-	TotalLines          int64
-	TotalEffectiveLines int64
-	TotalIgnoredLines   int64
-	TotalCoveredLines   int64
-	TotalViolationLines int64
+	Path                       string
+	TotalLines                 int64
+	TotalEffectiveLines        int64
+	TotalIgnoredLines          int64
+	TotalCoveredLines          int64
+	TotalViolationLines        int64
+	TotalCoveredButIgnoreLines int64
 }
 
 func (p *coverageTree) Statistics() *AllInformation {
 	return &AllInformation{
-		Path:                p.Root.Name,
-		TotalLines:          p.Root.TotalLines,
-		TotalEffectiveLines: p.Root.TotalEffectiveLines,
-		TotalIgnoredLines:   p.Root.TotalIgnoredLines,
-		TotalCoveredLines:   p.Root.TotalCoveredLines,
-		TotalViolationLines: p.Root.TotalViolationLines,
+		Path:                       p.Root.Name,
+		TotalLines:                 p.Root.TotalLines,
+		TotalEffectiveLines:        p.Root.TotalEffectiveLines,
+		TotalIgnoredLines:          p.Root.TotalIgnoredLines,
+		TotalCoveredLines:          p.Root.TotalCoveredLines,
+		TotalViolationLines:        p.Root.TotalViolationLines,
+		TotalCoveredButIgnoreLines: p.Root.TotalCoveredButIgnoreLines,
 	}
 }
 
@@ -95,12 +98,13 @@ func (p *coverageTree) All() []*AllInformation {
 		}
 
 		result = append(result, &AllInformation{
-			Path:                fullpathname,
-			TotalLines:          root.TotalLines,
-			TotalEffectiveLines: root.TotalEffectiveLines,
-			TotalIgnoredLines:   root.TotalIgnoredLines,
-			TotalCoveredLines:   root.TotalCoveredLines,
-			TotalViolationLines: root.TotalViolationLines,
+			Path:                       fullpathname,
+			TotalLines:                 root.TotalLines,
+			TotalEffectiveLines:        root.TotalEffectiveLines,
+			TotalIgnoredLines:          root.TotalIgnoredLines,
+			TotalCoveredLines:          root.TotalCoveredLines,
+			TotalViolationLines:        root.TotalViolationLines,
+			TotalCoveredButIgnoreLines: root.TotalCoveredButIgnoreLines,
 		})
 
 		for _, v := range root.Nodes {
@@ -159,11 +163,11 @@ func (p *coverageTree) CollectCoverageData() {
 
 // collect collects coverage data bottom-up.
 // After collecting, the root node contains the whole coverage view of the go module,
-// and return five values: total, effectived, ignored, covered, violation.
-func collect(root *TreeNode) (int64, int64, int64, int64, int64) {
+// and return five values: total, effectived, ignored, covered, violation, coveredButIgnored.
+func collect(root *TreeNode) (int64, int64, int64, int64, int64, int64) {
 	// when node is nil, return 0 for total, covered, and violation
 	if root == nil {
-		return 0, 0, 0, 0, 0
+		return 0, 0, 0, 0, 0, 0
 	}
 
 	// iterates over each sub node, and collects all the total, covered, and violation to current node.
@@ -172,13 +176,15 @@ func collect(root *TreeNode) (int64, int64, int64, int64, int64) {
 	var ignored int64 = 0
 	var covered int64 = 0
 	var violation int64 = 0
+	var coveredButIgnored int64 = 0
 	for _, node := range root.Nodes {
-		t, e, i, c, v := collect(node)
+		t, e, i, c, v, d := collect(node)
 		total += t
 		effectived += e
 		ignored += i
 		covered += c
 		violation += v
+		coveredButIgnored += d
 	}
 
 	root.TotalLines += total
@@ -186,10 +192,12 @@ func collect(root *TreeNode) (int64, int64, int64, int64, int64) {
 	root.TotalIgnoredLines += ignored
 	root.TotalCoveredLines += covered
 	root.TotalViolationLines += violation
+	root.TotalCoveredButIgnoreLines += coveredButIgnored
 
 	return root.TotalLines,
 		root.TotalEffectiveLines,
 		root.TotalIgnoredLines,
 		root.TotalCoveredLines,
-		root.TotalViolationLines
+		root.TotalViolationLines,
+		root.TotalCoveredButIgnoreLines
 }
