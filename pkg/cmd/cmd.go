@@ -160,6 +160,7 @@ func newDiffCoverageCommand() *cobra.Command {
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
+	cmd.Flags().StringVar(&o.GitHash, "gitHash", "", "gitHash for generating working source code links")
 
 	cmd.MarkFlagRequired("cover-profile")
 
@@ -203,6 +204,7 @@ func newFullCoverageCommand() *cobra.Command {
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
+	cmd.Flags().StringVar(&o.GitHash, "gitHash", "", "gitHash for generating working source code links")
 
 	cmd.MarkFlagRequired("cover-profile")
 
@@ -244,6 +246,7 @@ func newGoCoverTestCommand() *cobra.Command {
 	cmd.Flags().Float64Var(&o.CoverageBaseline, "coverage-baseline", o.CoverageBaseline, "returns an error code if coverage or quality score is less than coverage baseline")
 	cmd.Flags().StringVar(&o.ReportName, "report-name", "coverage", "diff coverage report name")
 	cmd.Flags().StringVar(&o.Style, "style", "colorful", "coverage report code format style, refer to https://pygments.org/docs/styles for more information")
+	cmd.Flags().StringVar(&o.GitHash, "gitHash", "", "gitHash for generating working source code links")
 	cmd.Flags().StringVar((*string)(&o.CoverageMode), "coverage-mode", string(gocover.FullCoverage), `mode for coverage, "full" or "diff"`)
 	cmd.Flags().StringVar((*string)(&o.ExecutorMode), "executor-mode", string(gocover.GoExecutor), `unit test mode, "go" or "ginkgo"`)
 	cmd.Flags().StringSliceVar(&o.GinkgoFlags, "ginkgo-flags", []string{"-r", "-trace", "-cover", "-coverpkg=./..."}, "ginkgo flags")
