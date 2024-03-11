@@ -75,14 +75,7 @@ func (md *MDGen) GenerateReport(statistics *Statistics) error {
 		violatedFiles++
 		report = append(report, "<details>\n")
 		coveragePercent := (profile.CoveredLines / profile.TotalEffectiveLines) * 100
-		circle := ":red_circle:"
-		if coveragePercent > 50 {
-			circle = ":orange_circle:"
-		}
-		if coveragePercent > 75 {
-			circle = ":yellow_circle:"
-		}
-		report = append(report, fmt.Sprintf("<summary>%s %d%% %s</summary>\n", strings.Join(strings.Split(profile.FileName, "/")[3:], "/"), coveragePercent, circle))
+		report = append(report, fmt.Sprintf("<summary>%s %d%% %s</summary>\n", strings.Join(strings.Split(profile.FileName, "/")[3:], "/"), coveragePercent, AddCircle(coveragePercent)))
 		for _, section := range profile.ViolationSections {
 			previousLineNumber := section.ViolationLines[0]
 			uncoveredStart := previousLineNumber
@@ -100,7 +93,7 @@ func (md *MDGen) GenerateReport(statistics *Statistics) error {
 		report = append(report, "\n</details>\n")
 	}
 
-	reportFile := filepath.Join(md.outputPath, finalName(md.reportName))
+	reportFile := filepath.Join(md.outputPath, md.reportName+".md")
 	f, err := os.Create(reportFile)
 	if err != nil {
 		return fmt.Errorf("create report file: %w", err)
@@ -112,7 +105,7 @@ func (md *MDGen) GenerateReport(statistics *Statistics) error {
 		return nil
 	}
 
-	output := strings.Join(append([]string{"#### Missing coverage for file(s) below:\n"}, report...), "\n")
+	output := strings.Join(append([]string{fmt.Sprintf("#### New code coverage: %.2f%% %s.\nMissing coverage for file(s) below:\n", statistics.TotalCoveragePercent, AddCircle(int(statistics.TotalCoveragePercent)))}, report...), "\n")
 	if len(report) > violatedFiles+6 {
 		output = strings.Join(strings.Split(output, "#L"), "?plain=1#L")
 	}
@@ -131,4 +124,17 @@ func (md *MDGen) GenerateFileLinks(filename string, startLineNum, endLineNum int
 	}
 
 	return link + snippet
+}
+
+func AddCircle(percent int) string {
+	if percent > 90 {
+		return ""
+	}
+	if percent > 75 {
+		return ":yellow_circle:"
+	}
+	if percent > 50 {
+		return ":orange_circle:"
+	}
+	return ":red_circle:"
 }
