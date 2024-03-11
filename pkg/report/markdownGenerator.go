@@ -74,8 +74,8 @@ func (md *MDGen) GenerateReport(statistics *Statistics) error {
 		}
 		violatedFiles++
 		report = append(report, "<details>\n")
-		coveragePercent := (profile.CoveredLines / profile.TotalEffectiveLines) * 100
-		report = append(report, fmt.Sprintf("<summary>%s %d%% %s</summary>\n", strings.Join(strings.Split(profile.FileName, "/")[3:], "/"), coveragePercent, AddCircle(coveragePercent)))
+		coveragePercent := (float64(profile.CoveredLines) / float64(profile.TotalEffectiveLines)) * 100
+		report = append(report, fmt.Sprintf("<summary>%s %.1f%% %s</summary>\n", strings.Join(strings.Split(profile.FileName, "/")[3:], "/"), coveragePercent, AddCircle(coveragePercent)))
 		for _, section := range profile.ViolationSections {
 			previousLineNumber := section.ViolationLines[0]
 			uncoveredStart := previousLineNumber
@@ -105,7 +105,7 @@ func (md *MDGen) GenerateReport(statistics *Statistics) error {
 		return nil
 	}
 
-	output := strings.Join(append([]string{fmt.Sprintf("#### New code coverage: %.2f%% %s.\nMissing coverage for file(s) below:\n", statistics.TotalCoveragePercent, AddCircle(int(statistics.TotalCoveragePercent)))}, report...), "\n")
+	output := strings.Join(append([]string{fmt.Sprintf("#### New code coverage: %.2f%% %s.\nMissing coverage for file(s) below:\n", statistics.TotalCoveragePercent, AddCircle(statistics.TotalCoveragePercent))}, report...), "\n")
 	if len(report) > violatedFiles+6 {
 		output = strings.Join(strings.Split(output, "#L"), "?plain=1#L")
 	}
@@ -126,7 +126,7 @@ func (md *MDGen) GenerateFileLinks(filename string, startLineNum, endLineNum int
 	return link + snippet
 }
 
-func AddCircle(percent int) string {
+func AddCircle(percent float64) string {
 	if percent > 90 {
 		return ""
 	}
