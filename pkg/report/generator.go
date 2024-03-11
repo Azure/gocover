@@ -44,10 +44,17 @@ const (
 	codeHighlightColor = "bg:#ffcccc"
 )
 
+func NewReportGenerator(codeStyle string, outputPath string, reportName string, logger logrus.FieldLogger, gitHash string, format string) ReportGenerator {
+	if format == "markdown" {
+		return NewMDReportGenerator(codeStyle, outputPath, reportName, logger, gitHash)
+	}
+	return NewHTMLReportGenerator(codeStyle, outputPath, reportName, logger)
+}
+
 // NewReportGenerator creates a html report generator to generate html coverage report.
 // We will use https://pygments.org/docs/styles to style the output,
 // and use // https://github.com/alecthomas/chroma to help to generate code snippets.
-func NewReportGenerator(
+func NewHTMLReportGenerator(
 	codeStyle string,
 	outputPath string,
 	reportName string,

@@ -20,6 +20,7 @@ type FullOption struct {
 	OutputDir        string
 	Excludes         []string
 	Style            string
+	GitHash          string
 
 	DbOption *dbclient.DBOption
 
@@ -52,6 +53,7 @@ type DiffOption struct {
 	OutputDir        string
 	Excludes         []string
 	Style            string
+	GitHash          string
 
 	DbOption *dbclient.DBOption
 
@@ -103,6 +105,7 @@ type GoCoverTestOption struct {
 	OutputDir        string
 	Excludes         []string
 	Style            string
+	GitHash          string
 
 	DbOption *dbclient.DBOption
 

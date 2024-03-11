@@ -333,6 +333,7 @@ func buildGoCover(
 			OutputDir:        option.OutputDir,
 			Excludes:         option.Excludes,
 			Style:            option.Style,
+			GitHash:          option.GitHash,
 			DbOption:         option.DbOption,
 			Logger:           logger,
 		})

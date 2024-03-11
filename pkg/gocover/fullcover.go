@@ -56,7 +56,7 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		coverageTree:    report.NewCoverageTree(modulePath),
 		logger:          logger,
 		dbClient:        dbClient,
-		reportGenerator: report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger),
+		reportGenerator: report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger, o.GitHash, o.ReportFormat),
 	}, nil
 
 }

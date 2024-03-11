@@ -58,7 +58,7 @@ func NewDiffCover(o *DiffOption) (GoCover, error) {
 		coverFilenames:   o.CoverProfiles,
 		coverageBaseline: o.CoverageBaseline,
 		dbClient:         dbClient,
-		reportGenerator:  report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger),
+		reportGenerator:  report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger, o.GitHash, o.ReportFormat),
 		logger:           logger,
 	}, nil
 

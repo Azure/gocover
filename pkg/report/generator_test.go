@@ -14,7 +14,7 @@ import (
 
 func TestNewReportGenerator(t *testing.T) {
 	t.Run("NewReportGenerator", func(t *testing.T) {
-		NewReportGenerator("colorful", "", "", logrus.New())
+		NewHTMLReportGenerator("colorful", "", "", logrus.New())
 	})
 }
 
