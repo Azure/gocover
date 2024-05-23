@@ -3,7 +3,7 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"sort"
 
@@ -195,7 +195,7 @@ func ReadPackages(filenames []string) (ps Packages, err error) {
 
 	// Parse the files, accumulate Packages.
 	for _, file := range files {
-		data, err := ioutil.ReadAll(file)
+		data, err := io.ReadAll(file)
 		if err != nil {
 			return nil, err
 		}

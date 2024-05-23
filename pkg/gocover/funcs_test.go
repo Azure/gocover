@@ -3,7 +3,6 @@ package gocover
 import (
 	"context"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -149,7 +148,7 @@ func TestFindFileContents(t *testing.T) {
 
 func foo() {
 }`
-		err := ioutil.WriteFile(filename, []byte(contents), 0644)
+		err := os.WriteFile(filename, []byte(contents), 0644)
 		if err != nil {
 			t.Errorf("prepare test environment failed: %s", err)
 		}
@@ -249,9 +248,9 @@ func TestParseGoModulePath(t *testing.T) {
 		os.MkdirAll(filepath.Join(dir, "empty"), os.ModePerm)
 		os.MkdirAll(filepath.Join(dir, "nonexist"), os.ModePerm)
 
-		ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/Azure/gocover"), 0644)
-		ioutil.WriteFile(filepath.Join(dir, "foo/go.mod"), []byte("module github.com/Azure/gocover/foo"), 0644)
-		ioutil.WriteFile(filepath.Join(dir, "empty/go.mod"), []byte(""), 0644)
+		os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/Azure/gocover"), 0644)
+		os.WriteFile(filepath.Join(dir, "foo/go.mod"), []byte("module github.com/Azure/gocover/foo"), 0644)
+		os.WriteFile(filepath.Join(dir, "empty/go.mod"), []byte(""), 0644)
 
 		var testSuites = []struct {
 			input  string

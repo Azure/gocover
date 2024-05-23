@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -208,7 +208,7 @@ func (g *gitClient) buildChangeFromChunks(filename string, chunks []diff.Chunk) 
 func (g *gitClient) buildChangeFromFile(filename string) (*Change, error) {
 
 	fullFilePath := filepath.Join(g.repositoryPath, filename)
-	data, err := ioutil.ReadFile(fullFilePath)
+	data, err := os.ReadFile(fullFilePath)
 	if err != nil {
 		return nil, err
 	}

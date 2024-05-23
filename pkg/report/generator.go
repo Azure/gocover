@@ -126,7 +126,7 @@ func (g *htmlReportGenerator) processCodeSnippets(statistics *Statistics) error 
 				html.WithLineNumbers(true),
 				html.LineNumbersInTable(true),
 				html.BaseLineNumber(section.StartLine),
-				html.LinkableLineNumbers(true, ""),
+				html.WithLinkableLineNumbers(true, ""),
 				html.HighlightLines(hlLines),
 			)
 

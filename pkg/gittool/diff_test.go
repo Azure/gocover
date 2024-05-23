@@ -1,7 +1,6 @@
 package gittool
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -76,7 +75,7 @@ bar
 hello world
 `
 		f := filepath.Join(path, filename)
-		err := ioutil.WriteFile(f, []byte(texts), 0644)
+		err := os.WriteFile(f, []byte(texts), 0644)
 		checkError(err)
 
 		g := &gitClient{repositoryPath: path}
@@ -300,7 +299,7 @@ func TestBuildChangeFromPatch(t *testing.T) {
 	hello world
 	`
 		f := filepath.Join(path, filename)
-		err := ioutil.WriteFile(f, []byte(texts), 0644)
+		err := os.WriteFile(f, []byte(texts), 0644)
 		checkError(err)
 
 		g := &gitClient{repositoryPath: path}
@@ -425,7 +424,7 @@ func TestIsGoFile(t *testing.T) {
 
 // temporalDir creates a temp directory for testing.
 func temporalDir() (path string, clean func()) {
-	tmpDir, err := ioutil.TempDir("", "gocover")
+	tmpDir, err := os.MkdirTemp("", "gocover")
 	checkError(err)
 
 	return tmpDir, func() {
@@ -436,7 +435,7 @@ func temporalDir() (path string, clean func()) {
 // temporalDir creates a temp git repository for testing.
 func temporalRepository(newBranch string) (string, *gogit.Repository, func()) {
 	// temp directory
-	tmpDir, err := ioutil.TempDir("", "gocover")
+	tmpDir, err := os.MkdirTemp("", "gocover")
 	checkError(err)
 
 	// init repository in temp directory
@@ -448,7 +447,7 @@ func temporalRepository(newBranch string) (string, *gogit.Repository, func()) {
 	checkError(err)
 
 	filename := filepath.Join(tmpDir, "example-git-file")
-	err = ioutil.WriteFile(filename, []byte("hello world!"), 0644)
+	err = os.WriteFile(filename, []byte("hello world!"), 0644)
 	checkError(err)
 
 	_, err = worktree.Add("example-git-file")
@@ -466,7 +465,7 @@ func temporalRepository(newBranch string) (string, *gogit.Repository, func()) {
 	// create new branch and checkout if needed
 	if newBranch != "" {
 		err = worktree.Checkout(&gogit.CheckoutOptions{
-			Branch: plumbing.ReferenceName(newBranch),
+			Branch: plumbing.NewBranchReferenceName(newBranch),
 			Create: true,
 		})
 		checkError(err)

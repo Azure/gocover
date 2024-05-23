@@ -1,7 +1,6 @@
 package report
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,7 +38,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
+		data, err := os.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -110,7 +109,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
+		data, err := os.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -193,7 +192,7 @@ func TestGenerateReport(t *testing.T) {
 			t.Errorf("should not error, but get: %s", err)
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
+		data, err := os.ReadFile(filepath.Join(g.outputPath, finalName(g.reportName)))
 		checkError(err)
 
 		reportString := string(data)
@@ -406,7 +405,7 @@ func TestIsDiffCoverageReport(t *testing.T) {
 
 // temporalDir creates a temp directory for testing.
 func temporalDir() (path string, clean func()) {
-	tmpDir, err := ioutil.TempDir("", "gocover")
+	tmpDir, err := os.MkdirTemp("", "gocover")
 	checkError(err)
 
 	return tmpDir, func() {
