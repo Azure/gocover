@@ -103,6 +103,13 @@ func TestKustoOptionValidate(t *testing.T) {
 			}
 		}
 
+		o.ManagedIdentityResouceID = "id"
+		o.tenantID = ""
+		o.clientID = ""
+		o.clientSecret = ""
+		if err := o.Validate(); err != nil {
+			t.Errorf("should success, but get %s", err)
+		}
 	})
 }
 

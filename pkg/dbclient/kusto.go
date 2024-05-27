@@ -9,13 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/Azure/azure-kusto-go/kusto"
 	"github.com/Azure/azure-kusto-go/kusto/ingest"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,14 +34,22 @@ const (
 )
 
 func NewKustoClient(option *KustoOption) (DbClient, error) {
-
-	authorizer := kusto.Authorization{
-		Config: auth.NewClientCredentialsConfig(option.clientID, option.clientSecret, option.tenantID),
+	var kcsb *kusto.ConnectionStringBuilder
+	if option.ManagedIdentityResouceID != "" {
+		msiCred, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+			ID: azidentity.ResourceID(option.ManagedIdentityResouceID),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("new managed identity credential: %w", err)
+		}
+		kcsb = kusto.NewConnectionStringBuilder(option.Endpoint).WithTokenCredential(msiCred)
+	} else {
+		kcsb = kusto.NewConnectionStringBuilder(option.Endpoint).WithAadAppKey(option.clientID, option.clientSecret, option.tenantID)
 	}
 
-	kustoClient, err := kusto.New(option.Endpoint, authorizer)
+	kustoClient, err := kusto.New(kcsb)
 	if err != nil {
-		return nil, fmt.Errorf("kusto: %w", err)
+		return nil, fmt.Errorf("new kusto: %w", err)
 	}
 
 	coverageIngestor, err := ingest.New(kustoClient, option.Database, option.CoverageEvent)
@@ -79,7 +86,7 @@ type KustoClient struct {
 var _ DbClient = (*KustoClient)(nil)
 
 func (client *KustoClient) StoreCoverageDataFromFile(ctx context.Context, data []*CoverageData) error {
-	file, err := ioutil.TempFile("", "coveragedata")
+	file, err := os.CreateTemp("", "coveragedata")
 	if err != nil {
 		return err
 	}
@@ -115,6 +122,7 @@ func (client *KustoClient) StoreCoverageDataFromFile(ctx context.Context, data [
 		ctx, file.Name(),
 		ingest.FileFormat(ingest.JSON),
 		ingest.IngestionMapping(mappingsBytes, ingest.JSON),
+		ingest.ReportResultToTable(),
 	)
 
 	client.logger.Debugf("send coverage data file %s to kusto", file.Name())
@@ -122,7 +130,7 @@ func (client *KustoClient) StoreCoverageDataFromFile(ctx context.Context, data [
 }
 
 func (client *KustoClient) StoreIgnoreProfileDataFromFile(ctx context.Context, data []*IgnoreProfileData) error {
-	file, err := ioutil.TempFile("", "ignoreprofiledata")
+	file, err := os.CreateTemp("", "ignoreprofiledata")
 	if err != nil {
 		return err
 	}
@@ -158,6 +166,7 @@ func (client *KustoClient) StoreIgnoreProfileDataFromFile(ctx context.Context, d
 		ctx, file.Name(),
 		ingest.FileFormat(ingest.JSON),
 		ingest.IngestionMapping(mappingsBytes, ingest.JSON),
+		ingest.ReportResultToTable(),
 	)
 	client.logger.Debugf("send ignore profile data file %s to kusto", file.Name())
 	return err
@@ -234,6 +243,8 @@ type KustoOption struct {
 	CustomColumns []string
 	Logger        logrus.FieldLogger
 
+	ManagedIdentityResouceID string
+
 	tenantID     string
 	clientID     string
 	clientSecret string
@@ -244,16 +255,18 @@ type KustoOption struct {
 
 // Validate checks the validation of the input on kusto option.
 func (o *KustoOption) Validate() error {
-	if o.tenantID = os.Getenv(tenantIDKey); o.tenantID == "" {
-		return fmt.Errorf("%s %w", tenantIDKey, ErrEnvRequired)
-	}
+	if o.ManagedIdentityResouceID == "" {
+		if o.tenantID = os.Getenv(tenantIDKey); o.tenantID == "" {
+			return fmt.Errorf("%s %w", tenantIDKey, ErrEnvRequired)
+		}
 
-	if o.clientID = os.Getenv(clientIDKey); o.clientID == "" {
-		return fmt.Errorf("%s %w", clientIDKey, ErrEnvRequired)
-	}
+		if o.clientID = os.Getenv(clientIDKey); o.clientID == "" {
+			return fmt.Errorf("%s %w", clientIDKey, ErrEnvRequired)
+		}
 
-	if o.clientSecret = os.Getenv(clientSecretKey); o.clientSecret == "" {
-		return fmt.Errorf("%s %w", clientSecretKey, ErrEnvRequired)
+		if o.clientSecret = os.Getenv(clientSecretKey); o.clientSecret == "" {
+			return fmt.Errorf("%s %w", clientSecretKey, ErrEnvRequired)
+		}
 	}
 
 	if o.Endpoint == "" {

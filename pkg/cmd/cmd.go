@@ -113,6 +113,7 @@ func NewGoCoverCommand(version, commit, date string) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.Database, "database", "", "kusto database")
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.CoverageEvent, "coverage-event", "", "kusto event for coverage")
 	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.IgnoreEvent, "ignore-event", "", "kusto event for ignore information")
+	cmd.PersistentFlags().StringVar(&dbOption.KustoOption.ManagedIdentityResouceID, "managed-identity-resource-id", "", "managed identity resource id for auth for kusto")
 	cmd.PersistentFlags().StringSliceVar(&dbOption.KustoOption.CustomColumns, "custom-columns", []string{}, "custom kusto columns, format: {column}:{datatype}:{value}")
 	cmd.PersistentFlags().IntVar(&timeoutInSeconds, "timeout", defaultTimeoutInSeconds, "execute timeout in seconds")
 

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -209,7 +208,7 @@ var (
 // parseGoModulePath uses modfile package to parse go module path
 func parseGoModulePath(goModDir string) (string, error) {
 	goModFilename := filepath.Join(goModDir, "go.mod")
-	bs, err := ioutil.ReadFile(goModFilename)
+	bs, err := os.ReadFile(goModFilename)
 	if err != nil {
 		return "", err
 	}
@@ -224,7 +223,7 @@ func parseGoModulePath(goModDir string) (string, error) {
 
 // createGoCoverTempDirectory creates temp directory that used for gocover outputs
 func createGoCoverTempDirectory() (string, error) {
-	tmpDir, err := ioutil.TempDir("", "gocover")
+	tmpDir, err := os.MkdirTemp("", "gocover")
 	if err != nil {
 		return "", err
 	}
