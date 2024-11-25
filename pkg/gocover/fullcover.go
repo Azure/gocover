@@ -47,16 +47,17 @@ func NewFullCover(o *FullOption) (GoCover, error) {
 		repositoryAbsPath, modulePath, o.OutputDir, o.Excludes)
 
 	return &fullCover{
-		coverFilenames:  o.CoverProfiles,
-		modulePath:      modulePath,
-		repositoryPath:  repositoryAbsPath,
-		excludeFiles:    make(excludeFileCache),
-		excludePatterns: o.Excludes,
-		moduleDir:       o.ModuleDir,
-		coverageTree:    report.NewCoverageTree(modulePath),
-		logger:          logger,
-		dbClient:        dbClient,
-		reportGenerator: report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger),
+		coverFilenames:   o.CoverProfiles,
+		coverageBaseline: o.CoverageBaseline,
+		modulePath:       modulePath,
+		repositoryPath:   repositoryAbsPath,
+		excludeFiles:     make(excludeFileCache),
+		excludePatterns:  o.Excludes,
+		moduleDir:        o.ModuleDir,
+		coverageTree:     report.NewCoverageTree(modulePath),
+		logger:           logger,
+		dbClient:         dbClient,
+		reportGenerator:  report.NewReportGenerator(o.Style, o.OutputDir, o.ReportName, o.Logger),
 	}, nil
 
 }
@@ -65,13 +66,15 @@ var _ GoCover = (*fullCover)(nil)
 
 // diffCoverage implements the GoCover interface and generate the full coverage statistics.
 type fullCover struct {
-	coverFilenames  []string
-	moduleDir       string
-	modulePath      string
-	repositoryPath  string
-	excludePatterns []string
-	ignoreProfiles  []*annotation.IgnoreProfile
-	excludeFiles    excludeFileCache
+	coverFilenames   []string
+	coverageBaseline float64
+	moduleDir        string
+	modulePath       string
+	repositoryPath   string
+	excludePatterns  []string
+	ignoreProfiles   []*annotation.IgnoreProfile
+	excludeFiles     excludeFileCache
+
 	coverageTree    report.CoverageTree
 	reportGenerator report.ReportGenerator
 	dbClient        dbclient.DbClient
@@ -94,6 +97,24 @@ func (full *fullCover) Run(ctx context.Context) error {
 		return fmt.Errorf("%w", err)
 	}
 
+	if err := full.pass(statistics); err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	return nil
+}
+
+func (full *fullCover) pass(statistics *report.Statistics) error {
+	if statistics.TotalCoveragePercent < full.coverageBaseline {
+		return WrapErrorWithCode(
+			fmt.Errorf("the coverage baseline pass rate is %.2f, currently is %.2f",
+				full.coverageBaseline,
+				statistics.TotalCoveragePercent,
+			),
+			LowCoverageErrorExitCode,
+			"",
+		)
+	}
 	return nil
 }
 
