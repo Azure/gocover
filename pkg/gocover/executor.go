@@ -94,9 +94,17 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 			"executor":  "go",
 		},
 	)
+	goFlags := []string{}
+	for _, flag := range t.flags {
+		if trimmed := strings.TrimSpace(flag); trimmed != "" {
+			goFlags = append(goFlags, trimmed)
+		}
+	}
+	goFlagsStr := fmt.Sprintf("%s %s", t.executable, strings.Join(goFlags, " "))
 
 	coverFile := filepath.Join(t.outputDir, outCoverageProfile)
-	testString := fmt.Sprintf("go test ./... -coverprofile %s -coverpkg=./... -v", coverFile)
+
+	testString := fmt.Sprintf("go test ./... %s -coverprofile %s -coverpkg=./... -v", goFlagsStr, coverFile)
 
 	cmd := exec.Command(t.executable, "test", "./...", "-coverprofile", coverFile, "-coverpkg=./...", "-v")
 	cmd.Dir = filepath.Join(t.repositoryPath, t.moduleDir)
