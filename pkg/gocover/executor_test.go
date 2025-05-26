@@ -55,8 +55,8 @@ func TestGoBuiltInTestExecutor_Run_Success(t *testing.T) {
 	}
 
 	executor.Run(context.Background())
-	a := logBuf.String()
-	assert.Contains(t, a, "go test ./... -count=1")
+	logStr := logBuf.String()
+	assert.Contains(t, logStr, "go test ./... -count=1 -coverprofile /tmp/coverage.out -coverpkg=./... -v")
 }
 
 func TestGoBuiltInTestExecutor_Run_CommandFails(t *testing.T) {
