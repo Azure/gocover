@@ -53,7 +53,6 @@ func NewGoCoverTestExecutor(o *GoCoverTestOption) (GoCoverTestExecutor, error) {
 			option:         o,
 		}, nil
 	case GinkgoExecutor:
-
 		return &ginkgoTestExecutor{
 			repositoryPath: repositoryAbsPath,
 			flags:          o.GinkgoFlags,
@@ -101,23 +100,23 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 		}
 	}
 	coverFile := filepath.Join(t.outputDir, outCoverageProfile)
-	goTestArgs := []string{t.executable,
-		"test", "./...",
-		strings.Join(goFlags, " "),
+
+	goArgs := []string{"test", "./..."}
+	goArgs = append(goArgs, goFlags...)
+	goArgs = append(goArgs,
 		"-coverprofile", coverFile,
 		"-coverpkg=./...",
-		"-v"}
-	runString := strings.Join(goTestArgs, " ")
+		"-v")
 
-	cmd := exec.Command(runString)
+	cmd := exec.Command(t.executable, goArgs...)
 	cmd.Dir = filepath.Join(t.repositoryPath, t.moduleDir)
 	cmd.Stdin = nil
 	cmd.Stdout = t.stdout
 	cmd.Stderr = t.stderr
 
-	logger.Infof("run unit tests: '%s'", runString)
+	logger.Infof("run unit tests: '%s'", cmd.String())
 	if err := cmd.Run(); err != nil {
-		t.logger.WithError(err).Errorf(`run unit test '%s'`, runString)
+		t.logger.WithError(err).Errorf(`run unit test '%s'`, cmd.String())
 		return WrapErrorWithCode(errors.New("unit test failed"), UnitTestFailedErrorExitCode, "")
 	}
 

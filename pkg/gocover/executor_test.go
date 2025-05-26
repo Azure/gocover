@@ -24,7 +24,7 @@ func (m *mockGoCover) Run(ctx context.Context) error {
 // Helper to patch exec.Command for testing
 var execCommand = exec.Command
 
-func TestGoBuiltInTestExecutor_Run_Success(t *testing.T) {
+func TestGoBuiltInTestExecutor_Run_Contains_Go_Flag(t *testing.T) {
 	// Patch exec.Command to simulate success
 	oldCommand := execCommand
 	execCommand = func(name string, arg ...string) *exec.Cmd {
@@ -55,8 +55,8 @@ func TestGoBuiltInTestExecutor_Run_Success(t *testing.T) {
 	}
 
 	executor.Run(context.Background())
-	a := logBuf.String()
-	assert.Contains(t, a, "go test ./... -count=1")
+	logStr := logBuf.String()
+	assert.Contains(t, logStr, "test ./... -count=1")
 }
 
 func TestGoBuiltInTestExecutor_Run_CommandFails(t *testing.T) {
