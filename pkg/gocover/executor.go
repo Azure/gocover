@@ -100,21 +100,20 @@ func (t *goBuiltInTestExecutor) Run(ctx context.Context) error {
 			goFlags = append(goFlags, trimmed)
 		}
 	}
-	goFlagsStr := fmt.Sprintf("%s %s", t.executable, strings.Join(goFlags, " "))
-
 	coverFile := filepath.Join(t.outputDir, outCoverageProfile)
+	goTestArgs := []string{"test", "./...", strings.Join(goFlags, " "),
+		"-coverprofile", coverFile, "-coverpkg=./...", "-v"}
+	runString := fmt.Sprintf("%s %s", t.executable, strings.Join(goTestArgs, " "))
 
-	testString := fmt.Sprintf("go test ./... %s -coverprofile %s -coverpkg=./... -v", goFlagsStr, coverFile)
-
-	cmd := exec.Command(t.executable, "test", "./...", "-coverprofile", coverFile, "-coverpkg=./...", "-v")
+	cmd := exec.Command(runString)
 	cmd.Dir = filepath.Join(t.repositoryPath, t.moduleDir)
 	cmd.Stdin = nil
 	cmd.Stdout = t.stdout
 	cmd.Stderr = t.stderr
 
-	logger.Infof("run unit tests: '%s'", testString)
+	logger.Infof("run unit tests: '%s'", runString)
 	if err := cmd.Run(); err != nil {
-		t.logger.WithError(err).Errorf(`run unit test '%s'`, testString)
+		t.logger.WithError(err).Errorf(`run unit test '%s'`, runString)
 		return WrapErrorWithCode(errors.New("unit test failed"), UnitTestFailedErrorExitCode, "")
 	}
 
