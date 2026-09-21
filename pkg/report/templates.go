@@ -76,7 +76,7 @@ var htmlCoverageReport = "" +
 
         <p>
             <b>Coverage </b> = Covered / Total <br />
-            <b>Coverage (with ignorance) </b> = (Covered - CoveredButIngored) / Effective <br />
+            <b>Coverage (with ignorance) </b> = (Covered - CoveredButIgnored) / Effective <br />
             <b>Total</b> = Effective + Ignored
         </p>
 
