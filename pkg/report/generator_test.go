@@ -17,6 +17,18 @@ func TestNewReportGenerator(t *testing.T) {
 	})
 }
 
+func TestGenerateReportClosesFile(t *testing.T) {
+	path := t.TempDir()
+	g := NewReportGenerator("colorful", path, "empty", logrus.New())
+	if err := g.GenerateReport(&Statistics{StatisticsType: DiffStatisticsType}); err != nil {
+		t.Fatal(err)
+	}
+	// Windows cannot delete a report while its file handle is still open.
+	if err := os.Remove(filepath.Join(path, "empty.html")); err != nil {
+		t.Fatalf("remove generated report: %v", err)
+	}
+}
+
 func TestGenerateReport(t *testing.T) {
 	t.Run("no diff information", func(t *testing.T) {
 		path, clean := temporalDir()
