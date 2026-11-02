@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/gocover/pkg/parser"
 	"github.com/Azure/gocover/pkg/report"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/tools/cover"
 )
 
 func NewDiffCover(o *DiffOption) (GoCover, error) {
@@ -157,15 +158,28 @@ func (diff *diffCover) generateStatistics() (*report.Statistics, error) {
 		return nil, err
 	}
 
+	statistics := &report.Statistics{
+		StatisticsType: report.DiffStatisticsType,
+		ComparedBranch: diff.comparedBranch,
+	}
+	if len(changes) == 0 {
+		// Keep profile validation without resolving packages or parsing source files.
+		for _, filename := range diff.coverFilenames {
+			if _, err := cover.ParseProfiles(filename); err != nil {
+				return nil, fmt.Errorf("parse cover profile: %w", err)
+			}
+		}
+		diff.logger.Info("No applicable changed Go code; generating an empty diff coverage report.")
+		diff.coverageTree.CollectCoverageData()
+		reBuildStatistics(statistics, diff.excludeFiles)
+		return statistics, nil
+	}
+
 	packages, err := parser.NewParser(diff.coverFilenames, diff.logger).Parse(changes)
 	if err != nil {
 		return nil, err
 	}
 
-	statistics := &report.Statistics{
-		StatisticsType: report.DiffStatisticsType,
-		ComparedBranch: diff.comparedBranch,
-	}
 	m := make(map[string]*report.CoverageProfile)
 	fileCache := make(fileContentsCache)
 	added := make(map[string]*report.CoverageProfile)
