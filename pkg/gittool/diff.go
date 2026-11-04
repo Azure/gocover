@@ -48,7 +48,7 @@ func (g *gitClient) DiffChangesFromCommitted(compareBranch string) ([]*Change, e
 		return nil, fmt.Errorf("execute diff: %w", err)
 	}
 
-	var diffChanges []*Change
+	diffChanges := make([]*Change, 0)
 	for _, change := range changes {
 		patch, err := change.Patch()
 		if err != nil {

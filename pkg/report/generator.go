@@ -2,6 +2,7 @@ package report
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"os"
@@ -78,9 +79,9 @@ func NewReportGenerator(
 }
 
 // GenerateReport process the diff coverage profile statistics and generate the final html report.
-func (g *htmlReportGenerator) GenerateReport(statistics *Statistics) error {
+func (g *htmlReportGenerator) GenerateReport(statistics *Statistics) (err error) {
 
-	err := g.processCodeSnippets(statistics)
+	err = g.processCodeSnippets(statistics)
 	if err != nil {
 		return fmt.Errorf("process code snippets: %w", err)
 	}
@@ -90,6 +91,11 @@ func (g *htmlReportGenerator) GenerateReport(statistics *Statistics) error {
 	if err != nil {
 		return fmt.Errorf("create report file: %w", err)
 	}
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			err = errors.Join(err, fmt.Errorf("close report file: %w", closeErr))
+		}
+	}()
 
 	err = htmlCoverageReportTemplate.Execute(f, statistics)
 	if err != nil {

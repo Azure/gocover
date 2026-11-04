@@ -52,6 +52,44 @@ func TestDiffChanges(t *testing.T) {
 	})
 }
 
+func TestDiffChangesFromCommittedEmptyResult(t *testing.T) {
+	for _, filename := range []string{"config.yaml", "sample_test.go"} {
+		t.Run(filename, func(t *testing.T) {
+			path, repo, clean := temporalRepository("")
+			defer clean()
+			base, err := repo.Head()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(path, filename), []byte("changed\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			worktree, err := repo.Worktree()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := worktree.Add(filename); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := worktree.Commit("ineligible change", &gogit.CommitOptions{
+				Author: &object.Signature{Name: "Test", Email: "test@example.com", When: time.Now()},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			client := &gitClient{repository: repo, repositoryPath: path}
+			for _, baseline := range []string{base.Hash().String(), "HEAD"} {
+				changes, err := client.DiffChangesFromCommitted(baseline)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if changes == nil || len(changes) != 0 {
+					t.Fatalf("expected a non-nil empty diff, got %#v", changes)
+				}
+			}
+		})
+	}
+}
+
 func TestBuildChangeFromFile(t *testing.T) {
 	t.Run("when read file fail", func(t *testing.T) {
 		path, clean := temporalDir()
